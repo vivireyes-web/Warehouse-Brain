@@ -1,0 +1,2953 @@
+<!doctype html>
+<html lang="es">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse Brain</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <style>
+        body {
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+        }
+        .app-wrapper {
+            height: 100%;
+            overflow-y: auto;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+        }
+        .danger-card {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        }
+        .success-card {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .warning-card {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+        .bg-esmax-dark {
+            background: linear-gradient(135deg, #0f766e 0%, #134e4a 100%);
+        }
+        .bg-esmax-light {
+            background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+        }
+        .text-esmax {
+            color: #0f766e;
+        }
+        .border-esmax {
+            border-color: #06b6d4;
+        }
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.6);
+        }
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.86);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .auth-panel {
+            width: min(100%, 680px);
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 80px rgba(15, 23, 42, 0.25);
+        }
+        .auth-tab-btn.active {
+            background: #0ea5e9;
+            color: white;
+        }
+        .auth-message {
+            border-radius: 0.75rem;
+            padding: 0.85rem 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .auth-message.success {
+            background: #ecfdf5;
+            color: #166534;
+            border: 1px solid #a7f3d0;
+        }
+        .auth-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .abc-label-a {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .abc-label-b {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .abc-label-c {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .chart-wrapper {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+    </style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+ </head>
+ <body class="bg-gradient-to-br from-slate-50 via-cyan-50 to-emerald-50 min-h-full">
+  <div class="app-wrapper">
+   <div class="container mx-auto px-4 py-8"><!-- Header -->
+    <div class="text-center mb-8">
+     <h1 class="text-4xl font-bold bg-esmax-dark text-white p-4 rounded-xl shadow-lg mb-2 inline-block">📦 Warehouse Brain</h1>
+     <p class="text-teal-700 text-lg mt-2">Sistema integrado con EOQ, FIFO y evaluación de proveedores</p>
+    </div><!-- Navigation Tabs -->
+    <div id="auth-overlay" class="auth-overlay">
+     <div class="auth-panel">
+      <div class="flex border-b border-slate-200">
+       <button type="button" onclick="showAuthPanel('login')" id="auth-tab-login" class="auth-tab-btn flex-1 py-4 text-center text-slate-700 font-semibold">Iniciar Sesión</button>
+       <button type="button" onclick="showAuthPanel('register')" id="auth-tab-register" class="auth-tab-btn flex-1 py-4 text-center text-slate-700 font-semibold">Registrarse</button>
+       <button type="button" onclick="showAuthPanel('reset')" id="auth-tab-reset" class="auth-tab-btn flex-1 py-4 text-center text-slate-700 font-semibold">Restablecer Contraseña</button>
+      </div>
+      <div class="p-6">
+       <div id="auth-message" class="auth-message hidden"></div>
+       <div id="login-panel">
+        <h3 class="text-2xl font-bold text-slate-900 mb-4">Bienvenido de nuevo</h3>
+        <form id="login-form" class="space-y-4">
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Correo Electrónico</label> <input id="login-email" type="email" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Contraseña</label> <input id="login-password" type="password" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-xl">Iniciar Sesión</button>
+        </form>
+       </div>
+       <div id="register-panel" class="hidden">
+        <h3 class="text-2xl font-bold text-slate-900 mb-4">Crear cuenta</h3>
+        <form id="register-form" class="space-y-4">
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Correo Electrónico</label> <input id="register-email" type="email" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Nombre</label> <input id="register-name" type="text" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Cargo</label> <input id="register-role" type="text" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Contraseña</label> <input id="register-password" type="password" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl">Registrar Usuario</button>
+        </form>
+       </div>
+       <div id="reset-panel" class="hidden">
+        <h3 class="text-2xl font-bold text-slate-900 mb-4">Reestablecer contraseña</h3>
+        <form id="reset-form" class="space-y-4">
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Correo Electrónico</label> <input id="reset-email" type="email" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Nueva Contraseña</label> <input id="reset-password" type="password" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+         <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 rounded-xl">Reestablecer Contraseña</button>
+        </form>
+       </div>
+      </div>
+     </div>
+    </div>
+    <div class="flex flex-wrap justify-center mb-8 bg-white rounded-lg shadow-md p-2 border-2 border-cyan-200"><button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 bg-cyan-500 text-white"> 📊 Dashboard </button> <button onclick="showTab('entrada')" id="tab-entrada" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 📥 Entrada de Productos </button> <button onclick="showTab('preparacion')" id="tab-preparacion" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 🧾 Preparación Recepción </button> <button onclick="showTab('ubicacion')" id="tab-ubicacion" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 📍 Recepción </button> <button onclick="showTab('salida')" id="tab-salida" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 📤 Salida de Productos </button> <button onclick="showTab('inventory')" id="tab-inventory" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 📋 Inventario </button> <button onclick="showTab('transactions')" id="tab-transactions" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 📝 Transacciones </button> <button onclick="showTab('proveedores')" id="tab-proveedores" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 🤝 Evaluación de Proveedores </button> <button onclick="showTab('reportes')" id="tab-reportes" class="tab-btn px-6 py-3 rounded-lg font-medium transition-all duration-200 text-gray-600 hover:bg-gray-100"> 📈 Reportes Inteligentes </button>
+    </div><!-- Dashboard Tab -->
+    <div id="active-user-bar" class="hidden mb-8 bg-white rounded-xl shadow-md p-4 border border-cyan-200 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+     <div class="text-sm text-slate-700"><span class="font-semibold">Usuario activo:</span> <span id="active-user-name">-</span></div>
+     <div class="flex flex-col md:flex-row md:items-center gap-3">
+      <div class="text-sm text-slate-500" id="active-user-email">-</div>
+      <button type="button" onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">Cerrar sesión</button>
+     </div>
+    </div>
+    <div id="dashboard-tab" class="tab-content">
+     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div class="metric-card text-white p-6 rounded-xl shadow-lg">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-blue-100">Total Productos</p>
+         <p class="text-3xl font-bold" id="total-products">0</p>
+        </div>
+        <div class="text-4xl opacity-80">
+         📦
+        </div>
+       </div>
+      </div>
+      <div class="success-card text-white p-6 rounded-xl shadow-lg">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-green-100">Stock Total</p>
+         <p class="text-3xl font-bold" id="total-stock">0</p>
+        </div>
+        <div class="text-4xl opacity-80">
+         📊
+        </div>
+       </div>
+      </div>
+      <div class="warning-card text-white p-6 rounded-xl shadow-lg">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-yellow-100">Próximos a Vencer</p>
+         <p class="text-3xl font-bold" id="expiring-soon">0</p>
+        </div>
+        <div class="text-4xl opacity-80">
+         ⚠️
+        </div>
+       </div>
+      </div>
+      <div class="danger-card text-white p-6 rounded-xl shadow-lg">
+       <div class="flex items-center justify-between">
+        <div>
+         <p class="text-red-100">Stock Bajo</p>
+         <p class="text-3xl font-bold" id="low-stock">0</p>
+        </div>
+        <div class="text-4xl opacity-80">
+         🚨
+        </div>
+       </div>
+      </div>
+     </div><!-- Alerts Section -->
+     <div id="alerts-section" class="mb-8">
+      <h2 class="text-2xl font-bold text-gray-800 mb-4">🚨 Alertas del Sistema</h2>
+      <div id="alerts-container" class="space-y-3">
+       <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+        <p class="text-blue-700">💡 Agregue productos para comenzar a gestionar su inventario</p>
+       </div>
+      </div>
+     </div>
+    </div><!-- Entrada de Productos Tab -->
+    <div id="entrada-tab" class="tab-content hidden">
+     <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-8 border-t-4 border-emerald-500">
+      <div class="flex justify-between items-center mb-6">
+       <h2 class="text-2xl font-bold text-teal-800">📥 Entrada de Productos</h2>
+       <div class="flex gap-3"><button type="button" onclick="descargarPlantilla()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200">📋 Descargar Plantilla</button> <button type="button" onclick="document.getElementById('archivo-carga-masiva').click()" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200">📤 Carga Masiva</button> <input type="file" id="archivo-carga-masiva" accept=".csv,.xlsx,.xls" style="display:none;" onchange="procesarCargaMasiva(event)">
+       </div>
+      </div>
+      <form id="entrada-form" class="space-y-6"><!-- Datos Básicos -->
+       <div class="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-500">
+        <h3 class="font-semibold text-emerald-800 mb-4">Información del Producto</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Nombre del Producto*</label> <input type="text" id="entrada-nombre" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">SKU*</label> <input type="text" id="entrada-sku" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">GTIN13</label> <input type="text" id="entrada-gtin13" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+        </div>
+       </div><!-- Clasificación y Almacenamiento -->
+       <div class="bg-cyan-50 p-4 rounded-lg border-l-4 border-cyan-500">
+        <h3 class="font-semibold text-cyan-800 mb-4">Clasificación y Almacenamiento</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Inventario*</label> <select id="entrada-tipo-inventario" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"> <option value="">Seleccionar...</option> <option value="Materia Prima">Materia Prima</option> <option value="Producto Terminado">Producto Terminado</option> <option value="Repuesto">Repuesto</option> <option value="Insumo">Insumo</option> </select>
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Método de Almacenamiento*</label> <select id="entrada-metodo" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"> <option value="">Seleccionar...</option> <option value="FIFO (PEPS)">📥 FIFO - Primero Entra Primero Sale (PEPS)</option> <option value="LIFO (UEPS)">📤 LIFO - Último Entra Primero Sale (UEPS)</option> <option value="FEFO">⏰ FEFO - Primero Expira Primero Sale</option> <option value="Estantería">Estantería</option> <option value="Pallet">Pallet</option> <option value="Refrigerado">Refrigerado</option> <option value="Congelado">Congelado</option> </select>
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Clasificación de Peligrosidad*</label> <select id="entrada-peligrosidad" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"> <option value="">Seleccionar...</option> <option value="No Peligroso">No Peligroso</option> <option value="Inflamable">Inflamable</option> <option value="Tóxico">Tóxico</option> <option value="Corrosivo">Corrosivo</option> </select>
+         </div>
+        </div>
+       </div><!-- Datos Cuantitativos -->
+       <div class="bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500">
+        <h3 class="font-semibold text-teal-800 mb-4">Datos Cuantitativos</h3>
+        <div class="mb-4"><label class="flex items-center space-x-3 cursor-pointer"> <input type="checkbox" id="entrada-es-pallet" class="w-5 h-5 rounded border-cyan-300 text-cyan-600"> <span class="text-sm font-medium text-gray-700">📦 ¿Esta entrada es por Pallet?</span> </label>
+        </div>
+        <div id="entrada-unidad-section" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Unidad de Medida*</label> <select id="entrada-unidad" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"> <option value="">Seleccionar...</option> <option value="Unidad">Unidad</option> <option value="Caja">Caja</option> <option value="Bidón">Bidón</option> <option value="Bin">Bin</option> <option value="Cuñete">Cuñete</option> <option value="Tambor">Tambor</option> </select>
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Cantidad*</label> <input type="number" id="entrada-cantidad" required min="1" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Precio Unitario ($)*</label> <input type="number" id="entrada-precio" required min="0" step="0.01" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+        </div><!-- Sección Pallet (Oculta por defecto) -->
+        <div id="entrada-pallet-section" class="hidden mt-6 pt-6 border-t-2 border-teal-300">
+         <h4 class="font-semibold text-teal-800 mb-4">📦 Información del Pallet</h4>
+         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Cantidad de Pallets*</label> <input type="number" id="entrada-cantidad-pallets" min="1" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Ej: 5">
+          </div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Altura del Pallet (cm)*</label> <input type="number" id="entrada-altura-pallet" min="1" step="0.1" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Ej: 145.5">
+          </div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Peso del Pallet (kg)*</label> <input type="number" id="entrada-peso-pallet" min="1" step="0.1" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" placeholder="Ej: 1000.5">
+          </div>
+         </div>
+         <div class="mt-4 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+          <p class="text-sm text-blue-800"><strong>📊 Resumen:</strong></p>
+          <p id="pallet-summary" class="text-sm text-blue-700 mt-2">Ingrese los datos para ver el resumen</p>
+         </div>
+        </div>
+       </div><!-- Documentación y Proveedor -->
+       <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+        <h3 class="font-semibold text-blue-800 mb-4">Documentación y Proveedor</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Documento*</label> <select id="entrada-tipo-doc" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"> <option value="">Seleccionar...</option> <option value="Factura">Factura</option> <option value="Nota de Crédito">Nota de Crédito</option> <option value="Remisión">Remisión</option> <option value="Orden de Compra">Orden de Compra</option> </select>
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Número de Documento*</label> <input type="text" id="entrada-numero-doc" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Proveedor*</label> <input type="text" id="entrada-proveedor" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Lote*</label> <input type="text" id="entrada-lote" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+        </div>
+       </div><!-- Calidad y Fechas -->
+       <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500">
+        <h3 class="font-semibold text-purple-800 mb-4">Calidad y Fechas</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Calidad de Entrega*</label> <select id="entrada-calidad" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"> <option value="">Seleccionar...</option> <option value="Buena">✅ Buena</option> <option value="Regular">⚠️ Regular</option> <option value="Deficiente">❌ Deficiente</option> </select>
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Fecha de Vencimiento</label> <input type="date" id="entrada-vencimiento" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Fecha de Entrada*</label> <input type="date" id="entrada-fecha" required class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" value="">
+         </div>
+        </div>
+       </div><button type="submit" class="w-full bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg"> ✅ Registrar Entrada </button>
+      </form>
+     </div>
+    </div><!-- Solicitud de Ubicación Tab -->
+    <div id="preparacion-tab" class="tab-content hidden">
+     <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg p-8 border-t-4 border-emerald-500 space-y-8">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+       <div>
+        <h2 class="text-2xl font-bold text-emerald-800">🧾 Preparación de Recepción</h2>
+        <p class="text-slate-600 mt-1">Administre registros de recepción, visualice preparaciones y modifique estados con datos sincronizados por n8n.</p>
+       </div>
+       <button type="button" onclick="cargarPreparacionesRecepcion()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg">Actualizar preparaciones</button>
+      </div>
+      <div class="bg-emerald-50 p-6 rounded-xl border-l-4 border-emerald-500">
+       <h3 class="text-xl font-semibold text-emerald-800 mb-4">Registrar nueva preparación</h3>
+       <form id="preparacion-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">SKU</label> <input id="prep-sku" type="text" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">Proveedor</label> <input id="prep-proveedor" type="text" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">Lote</label> <input id="prep-lote" type="text" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">Fecha Vencimiento Lote</label> <input id="prep-vencimiento" type="date" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">Cantidad de Pallets</label> <input id="prep-cantidad-pallets" type="number" min="1" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">Fecha Ingreso</label> <input id="prep-fecha-ingreso" type="date" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div class="md:col-span-2"><label class="block text-sm font-medium text-slate-700 mb-2">Costo por Pallet</label> <input id="prep-costo-pallet" type="number" min="0" step="0.01" required class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div class="md:col-span-3"><button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl">Registrar Preparación</button></div>
+       </form>
+       <p id="prep-register-message" class="text-sm mt-3 text-slate-700"></p>
+      </div>
+      <div class="bg-white p-6 rounded-xl border border-slate-200">
+       <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-semibold text-slate-800">Preparaciones de recepción</h3>
+       </div>
+       <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+         <thead class="bg-slate-100">
+          <tr>
+           <th class="px-4 py-3">ID Entrada</th>
+           <th class="px-4 py-3">SKU</th>
+           <th class="px-4 py-3">Proveedor</th>
+           <th class="px-4 py-3">Lote</th>
+           <th class="px-4 py-3">Estado</th>
+           <th class="px-4 py-3">Usuario</th>
+          </tr>
+         </thead>
+         <tbody id="preparaciones-table-body" class="divide-y divide-slate-200">
+          <tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No hay preparaciones registradas</td></tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+      <div class="bg-slate-50 p-6 rounded-xl border border-slate-200">
+       <h3 class="text-xl font-semibold text-slate-800 mb-4">Modificar estado</h3>
+       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div><label class="block text-sm font-medium text-slate-700 mb-2">Buscar ID Entrada</label> <input id="prep-search-id" type="text" placeholder="EN-1" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"></div>
+        <div class="flex items-end"><button type="button" onclick="buscarPreparacionPorId()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-3 rounded-xl">Buscar</button></div>
+       </div>
+       <div id="preparacion-edit-panel" class="hidden space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Estado</label> <select id="prep-estado" onchange="handlePreparacionStateChange()" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"><option value="Pendiente">Pendiente</option><option value="En Revisión">En Revisión</option><option value="Aprobado">Aprobado</option><option value="Rechazado">Rechazado</option></select></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Motivo de Rechazo</label> <select id="prep-motivo" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500" disabled><option value="">Seleccione motivo</option><option value="no coincide con factura comercial">no coincide con factura comercial</option><option value="llegada fuera de horario establecido">llegada fuera de horario establecido</option><option value="Calidad inaceptable">Calidad inaceptable</option></select></div>
+         <div><label class="block text-sm font-medium text-slate-700 mb-2">Cantidad Rechazada</label> <input id="prep-cantidad-rechazada" type="number" min="0" class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500" disabled></div>
+        </div>
+        <button type="button" onclick="applyPreparacionChanges(event)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl">Aplicar Cambios</button>
+        <p id="prep-edit-message" class="text-sm text-slate-700"></p>
+       </div>
+      </div>
+     </div>
+    </div>
+    <div id="ubicacion-tab" class="tab-content hidden">
+     <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 border-t-4 border-indigo-500">
+      <h2 class="text-2xl font-bold text-indigo-800 mb-2">📍 Recepción</h2>
+      <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-500 mb-6">
+       <p class="text-indigo-900 text-sm leading-relaxed">
+        Ingrese el SKU y la cantidad de pallets a recibir. El sistema enviará estos datos a n8n y devolverá el ID de ubicación junto con el ID del pallet asignado.
+       </p>
+      </div>
+      <form id="ubicacion-form" class="space-y-6">
+       <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-500">
+        <h3 class="font-semibold text-indigo-800 mb-4">Datos de Recepción</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">SKU del Producto*</label>
+          <input type="text" id="ubicacion-sku" required placeholder="Ej: SKU001" class="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+         </div>
+         <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad de Pallets*</label>
+          <input type="number" id="ubicacion-cantidad-pallets" required min="1" step="1" placeholder="Ej: 5" class="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+         </div>
+        </div>
+       </div>
+       
+       <!-- Estado de búsqueda -->
+       <div id="ubicacion-estado" class="hidden p-4 rounded-lg"></div>
+       
+       <!-- Resultado de ubicación -->
+       <div id="ubicacion-resultado" class="hidden p-6 rounded-lg border-2">
+        <div class="text-center">
+         <p class="text-lg font-semibold mb-3" id="ubicacion-mensaje"></p>
+         <p class="text-2xl font-bold text-indigo-600" id="ubicacion-id"></p>
+        </div>
+       </div>
+       
+       <button type="submit" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg" id="btn-asignar-ubicacion">
+        📍 Asignar Ubicación
+       </button>
+      </form>
+     </div>
+    </div><!-- Salida de Productos Tab -->
+    <div id="salida-tab" class="tab-content hidden">
+     <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-8 border-t-4 border-red-500">
+      <h2 class="text-2xl font-bold text-red-800 mb-6">📤 Salida de Productos</h2>
+      <form id="salida-form" class="space-y-6">
+       <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+        <h3 class="font-semibold text-red-800 mb-4">Búsqueda del Producto</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Buscar por SKU o Nombre*</label> <input type="text" id="salida-busqueda" placeholder="Ingrese SKU o nombre del producto..." class="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+         </div>
+         <div class="flex items-end"><button type="button" onclick="buscarProductoSalida()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"> 🔍 Buscar </button>
+         </div>
+        </div>
+        <div id="salida-resultado" class="bg-white p-4 rounded-lg border border-red-200 hidden">
+         <div id="producto-info" class="space-y-2"></div>
+         <p id="stock-disponible" class="text-sm text-gray-600 mt-3"></p>
+        </div>
+       </div>
+       <div id="salida-cantidad-section" class="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-500 hidden">
+        <h3 class="font-semibold text-orange-800 mb-4">Cantidad a Retirar</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Cantidad a Retirar*</label> <input type="number" id="salida-cantidad" required min="1" class="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Pallets a Retirar</label> <input type="number" id="salida-pallets" min="0" class="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent" placeholder="0">
+         </div>
+         <div><label class="block text-sm font-medium text-gray-700 mb-2">Razón de la Salida</label> <select id="salida-razon" class="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"> <option value="Venta">Venta</option> <option value="Devolución">Devolución</option> <option value="Merma">Merma</option> <option value="Otro">Otro</option> </select>
+         </div>
+        </div>
+       </div>
+       <div id="salida-button-section" class="hidden"><button type="submit" class="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg"> ✅ Registrar Salida </button>
+       </div>
+      </form>
+     </div>
+    </div><!-- Inventory Tab -->
+    <div id="inventory-tab" class="tab-content hidden">
+     <div class="bg-white rounded-xl shadow-lg overflow-hidden border-t-4 border-cyan-500">
+      <div class="px-6 py-4 bg-gradient-to-r from-teal-50 to-cyan-50 border-b flex justify-between items-center">
+       <h2 class="text-2xl font-bold text-teal-800">📋 Inventario Actual - Método FIFO</h2><button onclick="exportarInventarioExcel()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200">📥 Exportar a Excel</button>
+      </div>
+      <div class="overflow-x-auto">
+       <table class="w-full">
+        <thead class="bg-gradient-to-r from-cyan-100 to-emerald-100">
+         <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Producto</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">SKU</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Stock Total</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pallets</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Stock Mín.</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Demanda Diaria</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">EOQ</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Estado</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Acciones</th>
+         </tr>
+        </thead>
+        <tbody id="inventory-table-body" class="bg-white divide-y divide-gray-200">
+         <tr>
+          <td colspan="8" class="px-6 py-8 text-center text-gray-500">📦 No hay productos en el inventario</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div>
+    </div><!-- Transactions Tab -->
+    <div id="transactions-tab" class="tab-content hidden">
+     <div class="bg-white rounded-xl shadow-lg overflow-hidden border-t-4 border-emerald-500">
+      <div class="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b">
+       <h2 class="text-2xl font-bold text-teal-800">📝 Historial de Transacciones</h2>
+      </div>
+      <div class="overflow-x-auto">
+       <table class="w-full">
+        <thead class="bg-gradient-to-r from-emerald-100 to-cyan-100">
+         <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Fecha/Hora</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Producto</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Tipo</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Cantidad</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Pallets</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Valor Total</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Razón</th>
+         </tr>
+        </thead>
+        <tbody id="transactions-table-body" class="bg-white divide-y divide-gray-200">
+         <tr>
+          <td colspan="6" class="px-6 py-8 text-center text-gray-500">📝 No hay transacciones registradas</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div>
+    </div><!-- Evaluación de Proveedores Tab -->
+    <div id="proveedores-tab" class="tab-content hidden">
+     <div class="max-w-6xl mx-auto"><!-- Criterios de Evaluación -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mb-8 border-t-4 border-purple-500">
+       <h2 class="text-2xl font-bold text-purple-800 mb-6">⚙️ Configurar Criterios de Evaluación</h2>
+       <p class="text-gray-600 mb-4">Asigne ponderaciones a cada criterio (Total debe ser exactamente 100%)</p>
+       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div class="bg-purple-50 p-4 rounded-lg border border-purple-200"><label class="block text-sm font-medium text-gray-700 mb-2">Precio (%)</label> <input type="number" id="criterio-precio" value="25" min="0" max="100" class="w-full px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200"><label class="block text-sm font-medium text-gray-700 mb-2">Plazo Despacho (%)</label> <input type="number" id="criterio-despacho" value="20" min="0" max="100" class="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div class="bg-cyan-50 p-4 rounded-lg border border-cyan-200"><label class="block text-sm font-medium text-gray-700 mb-2">Plazo Pago (%)</label> <input type="number" id="criterio-pago" value="15" min="0" max="100" class="w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+        </div>
+        <div class="bg-green-50 p-4 rounded-lg border border-green-200"><label class="block text-sm font-medium text-gray-700 mb-2">Relación Confianza (%)</label> <input type="number" id="criterio-confianza" value="20" min="0" max="100" class="w-full px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+        </div>
+        <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-200"><label class="block text-sm font-medium text-gray-700 mb-2">Calidad Producto (%)</label> <input type="number" id="criterio-calidad" value="20" min="0" max="100" class="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+        </div>
+       </div>
+       <div class="flex items-center justify-between bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border-l-4 border-yellow-400">
+        <div>
+         <p class="text-sm text-gray-700">Total de Ponderación:</p>
+         <p id="total-ponderacion" class="text-2xl font-bold text-yellow-600">100%</p>
+        </div>
+        <div>
+         <p id="estado-ponderacion" class="text-sm font-medium text-green-600">✅ Válido - Suma igual a 100%</p>
+        </div>
+       </div>
+      </div><!-- Calificar Proveedor -->
+      <div class="bg-white rounded-xl shadow-lg p-8 border-t-4 border-indigo-500">
+       <h2 class="text-2xl font-bold text-indigo-800 mb-6">🤝 Calificar Proveedor</h2>
+       <form id="proveedor-form" class="space-y-6"><!-- Información del Proveedor -->
+        <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-500">
+         <h3 class="font-semibold text-indigo-800 mb-4">Información del Proveedor</h3>
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Nombre del Proveedor*</label> <input type="text" id="prov-nombre" required class="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          </div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Contacto (Opcional)</label> <input type="text" id="prov-contacto" placeholder="Email, teléfono..." class="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          </div>
+         </div>
+        </div><!-- Calificaciones -->
+        <div class="bg-pink-50 p-4 rounded-lg border-l-4 border-pink-500">
+         <h3 class="font-semibold text-pink-800 mb-4">Califique según los siguientes criterios (1-10)</h3>
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-6"><!-- Precio -->
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Precio (1=Muy Caro, 10=Muy Económico)</label>
+           <div class="flex items-center space-x-2"><input type="range" id="prov-precio" min="1" max="10" value="5" class="flex-1 h-2 bg-gradient-to-r from-red-400 to-green-400 rounded-lg appearance-none cursor-pointer"> <span id="prov-precio-valor" class="bg-purple-100 text-purple-800 px-3 py-1 rounded-lg font-bold text-sm min-w-fit">5/10</span>
+           </div>
+          </div><!-- Plazo Despacho -->
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Plazo Despacho (1=Muy Lento, 10=Muy Rápido)</label>
+           <div class="flex items-center space-x-2"><input type="range" id="prov-despacho" min="1" max="10" value="5" class="flex-1 h-2 bg-gradient-to-r from-red-400 to-green-400 rounded-lg appearance-none cursor-pointer"> <span id="prov-despacho-valor" class="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg font-bold text-sm min-w-fit">5/10</span>
+           </div>
+          </div><!-- Plazo Pago -->
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Plazo Pago (1=Inmediato, 10=Muy Flexible)</label>
+           <div class="flex items-center space-x-2"><input type="range" id="prov-pago" min="1" max="10" value="5" class="flex-1 h-2 bg-gradient-to-r from-red-400 to-green-400 rounded-lg appearance-none cursor-pointer"> <span id="prov-pago-valor" class="bg-cyan-100 text-cyan-800 px-3 py-1 rounded-lg font-bold text-sm min-w-fit">5/10</span>
+           </div>
+          </div><!-- Relación Confianza -->
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Relación/Confianza (1=Muy Mala, 10=Muy Excelente)</label>
+           <div class="flex items-center space-x-2"><input type="range" id="prov-confianza" min="1" max="10" value="5" class="flex-1 h-2 bg-gradient-to-r from-red-400 to-green-400 rounded-lg appearance-none cursor-pointer"> <span id="prov-confianza-valor" class="bg-green-100 text-green-800 px-3 py-1 rounded-lg font-bold text-sm min-w-fit">5/10</span>
+           </div>
+          </div><!-- Calidad Producto -->
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Calidad Producto (1=Muy Mala, 10=Muy Excelente)</label>
+           <div class="flex items-center space-x-2"><input type="range" id="prov-calidad" min="1" max="10" value="5" class="flex-1 h-2 bg-gradient-to-r from-red-400 to-green-400 rounded-lg appearance-none cursor-pointer"> <span id="prov-calidad-valor" class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-lg font-bold text-sm min-w-fit">5/10</span>
+           </div>
+          </div><!-- Score Total -->
+          <div class="md:col-span-2">
+           <div class="bg-gradient-to-r from-indigo-100 to-purple-100 p-6 rounded-lg border-2 border-purple-300">
+            <p class="text-sm text-gray-600 mb-2">Puntuación Total Ponderada:</p>
+            <p id="score-total" class="text-4xl font-bold text-purple-600">5.0/10</p>
+            <p id="score-evaluacion" class="text-sm text-gray-600 mt-2">Basada en los criterios de evaluación configurados</p>
+           </div>
+          </div>
+         </div>
+        </div><button type="submit" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg"> 💾 Guardar Evaluación de Proveedor </button>
+       </form>
+      </div><!-- Proveedores Evaluados -->
+      <div class="bg-white rounded-xl shadow-lg p-8 mt-8 border-t-4 border-indigo-500">
+       <h2 class="text-2xl font-bold text-indigo-800 mb-6">📊 Proveedores Evaluados</h2>
+       <div id="proveedores-list" class="space-y-4">
+        <p class="text-gray-500 text-center py-8">No hay proveedores evaluados aún</p>
+       </div>
+      </div>
+     </div>
+    </div><!-- Reportes Inteligentes Tab -->
+    <div id="reportes-tab" class="tab-content hidden">
+     <div class="max-w-7xl mx-auto space-y-8"><!-- Análisis ABC por Valor -->
+      <div class="bg-white rounded-xl shadow-lg p-8 border-t-4 border-red-500">
+       <h2 class="text-2xl font-bold text-gray-800 mb-6">📊 Análisis ABC por Valor</h2>
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="chart-wrapper">
+         <div class="chart-container">
+          <canvas id="chartAbcValor"></canvas>
+         </div>
+        </div>
+        <div class="space-y-3">
+         <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+          <p class="text-sm text-gray-600">Productos A (80% Valor)</p>
+          <p id="abc-a-cantidad" class="text-2xl font-bold text-red-600">0 productos</p>
+          <p id="abc-a-valor" class="text-sm text-gray-600">Valor: $0.00</p>
+         </div>
+         <div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-500">
+          <p class="text-sm text-gray-600">Productos B (15% Valor)</p>
+          <p id="abc-b-cantidad" class="text-2xl font-bold text-yellow-600">0 productos</p>
+          <p id="abc-b-valor" class="text-sm text-gray-600">Valor: $0.00</p>
+         </div>
+         <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+          <p class="text-sm text-gray-600">Productos C (5% Valor)</p>
+          <p id="abc-c-cantidad" class="text-2xl font-bold text-green-600">0 productos</p>
+          <p id="abc-c-valor" class="text-sm text-gray-600">Valor: $0.00</p>
+         </div>
+        </div>
+       </div>
+       <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+         <thead class="bg-gray-100">
+          <tr>
+           <th class="px-4 py-3 text-left">Producto</th>
+           <th class="px-4 py-3 text-left">Valor Total</th>
+           <th class="px-4 py-3 text-left">% Inventario</th>
+           <th class="px-4 py-3 text-left">Clasificación</th>
+          </tr>
+         </thead>
+         <tbody id="abc-valor-tabla" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="4" class="px-4 py-6 text-center text-gray-500">Sin productos</td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div><!-- Análisis ABC por Rotación -->
+      <div class="bg-white rounded-xl shadow-lg p-8 border-t-4 border-blue-500">
+       <h2 class="text-2xl font-bold text-gray-800 mb-6">📊 Análisis ABC por Rotación</h2>
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="chart-wrapper">
+         <div class="chart-container">
+          <canvas id="chartAbcRotacion"></canvas>
+         </div>
+        </div>
+        <div class="space-y-3">
+         <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+          <p class="text-sm text-gray-600">Productos A (Rotación Alta)</p>
+          <p id="rot-a-cantidad" class="text-2xl font-bold text-red-600">0 productos</p>
+          <p id="rot-a-rotaciones" class="text-sm text-gray-600">Rotaciones: 0/año</p>
+         </div>
+         <div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-500">
+          <p class="text-sm text-gray-600">Productos B (Rotación Media)</p>
+          <p id="rot-b-cantidad" class="text-2xl font-bold text-yellow-600">0 productos</p>
+          <p id="rot-b-rotaciones" class="text-sm text-gray-600">Rotaciones: 0/año</p>
+         </div>
+         <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+          <p class="text-sm text-gray-600">Productos C (Rotación Baja)</p>
+          <p id="rot-c-cantidad" class="text-2xl font-bold text-green-600">0 productos</p>
+          <p id="rot-c-rotaciones" class="text-sm text-gray-600">Rotaciones: 0/año</p>
+         </div>
+        </div>
+       </div>
+      </div><!-- Inventario por Tipo -->
+      <div class="bg-white rounded-xl shadow-lg p-8 border-t-4 border-green-500">
+       <h2 class="text-2xl font-bold text-gray-800 mb-6">🏭 Inventario por Tipo de Producto</h2>
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="chart-wrapper">
+         <div class="chart-container">
+          <canvas id="chartTipoProducto"></canvas>
+         </div>
+        </div>
+        <div id="tipo-producto-stats" class="space-y-3">
+        </div>
+       </div>
+      </div><!-- Análisis EOQ Avanzado -->
+      <div class="bg-white rounded-xl shadow-lg p-8 border-t-4 border-purple-500">
+       <h2 class="text-2xl font-bold text-gray-800 mb-6">📈 Análisis EOQ Avanzado</h2>
+       <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-3">Filtrar por Producto:</label> <select id="filtro-eoq" class="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"> <option value="">Todos los productos</option> </select>
+       </div>
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="chart-wrapper">
+         <div class="chart-container">
+          <canvas id="chartEoqAnalisis"></canvas>
+         </div>
+        </div>
+        <div id="eoq-metricas" class="space-y-4">
+        </div>
+       </div>
+       <div class="overflow-x-auto mt-6">
+        <table class="w-full text-sm">
+         <thead class="bg-gray-100">
+          <tr>
+           <th class="px-4 py-3 text-left">Producto</th>
+           <th class="px-4 py-3 text-left">EOQ</th>
+           <th class="px-4 py-3 text-left">Stock Seg.</th>
+           <th class="px-4 py-3 text-left">Lead Time</th>
+           <th class="px-4 py-3 text-left">Frecuencia</th>
+           <th class="px-4 py-3 text-left">Costo Anual</th>
+          </tr>
+         </thead>
+         <tbody id="eoq-tabla" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="6" class="px-4 py-6 text-center text-gray-500">Sin productos</td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div><!-- Cadencia de Inventario -->
+      <div class="bg-white rounded-xl shadow-lg p-8 border-t-4 border-cyan-500">
+       <h2 class="text-2xl font-bold text-gray-800 mb-6">⏱️ Cadencia de Inventario</h2>
+       <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+         <thead class="bg-gray-100">
+          <tr>
+           <th class="px-4 py-3 text-left">Producto</th>
+           <th class="px-4 py-3 text-left">Días en Almacén</th>
+           <th class="px-4 py-3 text-left">Rotación/Año</th>
+           <th class="px-4 py-3 text-left">Desv. Estándar</th>
+           <th class="px-4 py-3 text-left">Variabilidad</th>
+          </tr>
+         </thead>
+         <tbody id="cadencia-tabla" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="5" class="px-4 py-6 text-center text-gray-500">Sin productos</td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div><!-- Product Details Modal -->
+   <div id="product-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-full overflow-y-auto">
+     <div class="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
+      <h3 class="text-xl font-bold text-gray-800" id="modal-title">Detalles del Producto</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+     </div>
+     <div class="p-6" id="modal-content"><!-- Content will be populated by JavaScript -->
+     </div>
+    </div>
+   </div><!-- Sale Form Modal -->
+   <div id="sale-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+     <div class="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
+      <h3 class="text-xl font-bold text-gray-800" id="sale-modal-title">Registrar Venta</h3><button onclick="closeSaleModal()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+     </div>
+     <div class="p-6">
+      <form id="sale-form">
+       <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-2">Cantidad a Vender</label> <input type="number" id="sale-quantity" required min="1" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+        <p class="text-sm text-gray-500 mt-1" id="available-stock">Stock disponible: 0 unidades</p>
+       </div>
+       <div class="flex space-x-3"><button type="button" onclick="closeSaleModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"> Cancelar </button> <button type="submit" class="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg"> Registrar Venta </button>
+       </div>
+      </form>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+        // Global variables
+        let inventario = {};
+        let registroTransacciones = [];
+        let proveedoresEvaluados = [];
+        let productoSalidaBuscado = null;
+        let chartInstances = {};
+        
+        // Constants
+        const DIAS_CUBRIR_SEGURIDAD = 7;
+        const COSTO_PEDIDO_FIJO = 50.0;
+        const COSTO_MANTENIMIENTO_ANUAL_PCT = 0.20;
+        const DIAS_LABORABLES_ANUALES = 300;
+        const LEAD_TIME_PROMEDIO = 7; // días
+        const N8N_WEBHOOK_BASE = 'https://vivii.app.n8n.cloud/webhook-test/';
+        const N8N_ENDPOINTS = {
+            auth: 'auth-system',
+            recepcion: 'recepcion-almacen',
+            registrarPreparacion: 'registrar-preparacion',
+            consultarPreparaciones: 'consultar-preparaciones',
+            modificarEstado: 'modificar-estado'
+        };
+        let activeUser = null;
+        let preparacionesRecepcion = [];
+        
+        function getN8nWebhookUrl(accion) {
+            switch (accion) {
+                case 'register_user':
+                case 'login_user':
+                case 'reset_password':
+                    return N8N_WEBHOOK_BASE + N8N_ENDPOINTS.auth;
+                case 'assign_location':
+                    return N8N_WEBHOOK_BASE + N8N_ENDPOINTS.recepcion;
+                case 'register_preparacion':
+                    return N8N_WEBHOOK_BASE + N8N_ENDPOINTS.registrarPreparacion;
+                case 'list_preparaciones':
+                    return N8N_WEBHOOK_BASE + N8N_ENDPOINTS.consultarPreparaciones;
+                case 'update_preparacion':
+                    return N8N_WEBHOOK_BASE + N8N_ENDPOINTS.modificarEstado;
+                default:
+                    return N8N_WEBHOOK_BASE + N8N_ENDPOINTS.auth;
+            }
+        }
+        
+        async function fetchN8n(accion, payload = {}) {
+            try {
+                const url = getN8nWebhookUrl(accion);
+                const respuesta = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accion, ...payload })
+                });
+                if (!respuesta.ok) {
+                    throw new Error(`Respuesta HTTP ${respuesta.status}`);
+                }
+                const datos = await respuesta.json();
+                return datos;
+            } catch (error) {
+                console.error('Error n8n:', error);
+                return { exito: false, error: 'No se pudo conectar con n8n. Intente de nuevo.' };
+            }
+        }
+
+        function showAuthPanel(panel) {
+            const tabs = ['login', 'register', 'reset'];
+            tabs.forEach(name => {
+                document.getElementById(`auth-tab-${name}`).classList.toggle('active', name === panel);
+                document.getElementById(`${name}-panel`).classList.toggle('hidden', name !== panel);
+            });
+            document.getElementById('auth-message').classList.add('hidden');
+        }
+
+        function setAuthMessage(message, type = 'success') {
+            const messageDiv = document.getElementById('auth-message');
+            messageDiv.textContent = message;
+            messageDiv.className = `auth-message ${type}`;
+            messageDiv.classList.remove('hidden');
+        }
+
+        async function registerUser(event) {
+            event.preventDefault();
+            const correo = document.getElementById('register-email').value.trim();
+            const nombre = document.getElementById('register-name').value.trim();
+            const cargo = document.getElementById('register-role').value.trim();
+            const contrasenia = document.getElementById('register-password').value.trim();
+            if (!correo || !nombre || !cargo || !contrasenia) {
+                setAuthMessage('Por favor complete todos los campos de registro.', 'error');
+                return;
+            }
+            const resultado = await fetchN8n('register_user', { correo_electronico: correo, nombre, cargo, contrasena: contrasenia });
+            if (resultado.exito) {
+                setAuthMessage('Usuario registrado exitosamente. Ingrese con sus credenciales.', 'success');
+                showAuthPanel('login');
+            } else {
+                setAuthMessage(resultado.error || 'Error en el registro. Intente nuevamente.', 'error');
+            }
+        }
+
+        async function loginUser(event) {
+            event.preventDefault();
+            const correo = document.getElementById('login-email').value.trim();
+            const contrasenia = document.getElementById('login-password').value.trim();
+            if (!correo || !contrasenia) {
+                setAuthMessage('Ingrese correo electrónico y contraseña.', 'error');
+                return;
+            }
+            const resultado = await fetchN8n('login_user', { correo_electronico: correo, contrasena: contrasenia });
+            if (resultado.exito && resultado.usuario) {
+                setAuthenticatedUser(resultado.usuario);
+                document.getElementById('auth-overlay').classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+                showTab('dashboard');
+                cargarPreparacionesRecepcion();
+            } else {
+                setAuthMessage(resultado.error || 'Error, por favor comprueba los campos', 'error');
+            }
+        }
+
+        async function resetPassword(event) {
+            event.preventDefault();
+            const correo = document.getElementById('reset-email').value.trim();
+            const nuevaContrasena = document.getElementById('reset-password').value.trim();
+            if (!correo || !nuevaContrasena) {
+                setAuthMessage('Ingrese correo electrónico y nueva contraseña.', 'error');
+                return;
+            }
+            const resultado = await fetchN8n('reset_password', { correo_electronico: correo, nueva_contrasena: nuevaContrasena });
+            if (resultado.exito) {
+                setAuthMessage('La contraseña se ha restablecido con éxito.', 'success');
+                showAuthPanel('login');
+            } else {
+                setAuthMessage(resultado.error || 'No se pudo restablecer la contraseña.', 'error');
+            }
+        }
+
+        function setAuthenticatedUser(usuario) {
+            activeUser = usuario;
+            document.getElementById('active-user-name').textContent = usuario.nombre || usuario.correo_electronico || 'Usuario';
+            document.getElementById('active-user-email').textContent = usuario.correo_electronico || '';
+            document.getElementById('active-user-bar').classList.remove('hidden');
+        }
+
+        function logout() {
+            activeUser = null;
+            document.getElementById('active-user-bar').classList.add('hidden');
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            showAuthPanel('login');
+        }
+
+        function getNextPreparacionId() {
+            if (preparacionesRecepcion.length === 0) return 'EN-1';
+            const ids = preparacionesRecepcion
+                .map(item => item.ID_entrada || item.id_entrada || '')
+                .filter(id => /^EN-\d+$/i.test(id))
+                .map(id => parseInt(id.split('-')[1], 10));
+            const max = ids.length ? Math.max(...ids) : 0;
+            return `EN-${max + 1}`;
+        }
+
+        async function cargarPreparacionesRecepcion() {
+            const resultado = await fetchN8n('list_preparaciones', {});
+            if (resultado.exito && Array.isArray(resultado.datos)) {
+                preparacionesRecepcion = resultado.datos;
+                renderPreparacionesTable();
+                return;
+            }
+            preparacionesRecepcion = [];
+            document.getElementById('preparaciones-table-body').innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No se pudieron cargar las preparaciones.</td></tr>`;
+        }
+
+        function renderPreparacionesTable() {
+            const tbody = document.getElementById('preparaciones-table-body');
+            if (!preparacionesRecepcion.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500">No hay preparaciones registradas</td></tr>`;
+                return;
+            }
+            const rows = preparacionesRecepcion.map(item => {
+                return `<tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3">${item.ID_entrada || item.id_entrada || 'N/A'}</td>
+                    <td class="px-4 py-3">${item.SKU || item.sku || 'N/A'}</td>
+                    <td class="px-4 py-3">${item.proveedor || 'N/A'}</td>
+                    <td class="px-4 py-3">${item.lote || 'N/A'}</td>
+                    <td class="px-4 py-3">${item.estado || 'Pendiente'}</td>
+                    <td class="px-4 py-3">${item.usuario || 'N/A'}</td>
+                </tr>`;
+            }).join('');
+            tbody.innerHTML = rows;
+        }
+
+        function buscarPreparacionPorId() {
+            const idBuscado = document.getElementById('prep-search-id').value.trim();
+            if (!idBuscado) {
+                document.getElementById('prep-edit-message').textContent = 'Ingrese un ID de entrada válido para buscar.';
+                return;
+            }
+            const preparacion = preparacionesRecepcion.find(item => (item.ID_entrada || item.id_entrada || '').toUpperCase() === idBuscado.toUpperCase());
+            if (!preparacion) {
+                document.getElementById('prep-edit-message').textContent = 'No se encontró la preparación con ese ID.';
+                document.getElementById('preparacion-edit-panel').classList.add('hidden');
+                return;
+            }
+            document.getElementById('prep-edit-message').textContent = '';
+            mostrarPreporacionEdit(preparacion);
+        }
+
+        function mostrarPreporacionEdit(preparacion) {
+            document.getElementById('preparacion-edit-panel').classList.remove('hidden');
+            document.getElementById('prep-estado').value = preparacion.estado || 'Pendiente';
+            document.getElementById('prep-motivo').value = preparacion.motivo_rechazo || '';
+            document.getElementById('prep-cantidad-rechazada').value = preparacion.cantidad_rechazada || '';
+            handlePreparacionStateChange();
+        }
+
+        function handlePreparacionStateChange() {
+            const estado = document.getElementById('prep-estado').value;
+            const motivo = document.getElementById('prep-motivo');
+            const cantidadRechazada = document.getElementById('prep-cantidad-rechazada');
+            if (estado === 'Rechazado') {
+                motivo.disabled = false;
+                cantidadRechazada.disabled = false;
+            } else {
+                motivo.disabled = true;
+                motivo.value = '';
+                cantidadRechazada.disabled = true;
+                cantidadRechazada.value = '';
+            }
+        }
+
+        async function applyPreparacionChanges(event) {
+            event.preventDefault();
+            const id = document.getElementById('prep-search-id').value.trim();
+            const estado = document.getElementById('prep-estado').value;
+            const motivo = document.getElementById('prep-motivo').value.trim();
+            const cantidadRechazada = document.getElementById('prep-cantidad-rechazada').value.trim();
+            if (!id) {
+                document.getElementById('prep-edit-message').textContent = 'Ingrese un ID de entrada para aplicar cambios.';
+                return;
+            }
+            if (estado === 'Rechazado' && (!motivo || !cantidadRechazada)) {
+                document.getElementById('prep-edit-message').textContent = 'Complete motivo y cantidad rechazada para estado Rechazado.';
+                return;
+            }
+            if (!activeUser) {
+                document.getElementById('prep-edit-message').textContent = 'Debe iniciar sesión para aplicar cambios.';
+                return;
+            }
+            const resultado = await fetchN8n('update_preparacion', {
+                ID_entrada: id,
+                estado,
+                motivo_rechazo: motivo,
+                cantidad_rechazada: cantidadRechazada,
+                usuario: activeUser.correo_electronico || activeUser.nombre || 'Usuario'
+            });
+            if (resultado.exito) {
+                document.getElementById('prep-edit-message').textContent = 'Cambios Aplicados con Éxito';
+                cargarPreparacionesRecepcion();
+            } else {
+                document.getElementById('prep-edit-message').textContent = resultado.error || 'No se pudieron aplicar los cambios.';
+            }
+        }
+
+        async function registrarPreparacion(event) {
+            event.preventDefault();
+            if (!activeUser) {
+                document.getElementById('prep-register-message').textContent = 'Debe iniciar sesión para registrar una preparación.';
+                return;
+            }
+            const sku = document.getElementById('prep-sku').value.trim();
+            const proveedor = document.getElementById('prep-proveedor').value.trim();
+            const lote = document.getElementById('prep-lote').value.trim();
+            const fechaVencimiento = document.getElementById('prep-vencimiento').value;
+            const cantidadPallets = document.getElementById('prep-cantidad-pallets').value.trim();
+            const fechaIngreso = document.getElementById('prep-fecha-ingreso').value;
+            const costoPallet = document.getElementById('prep-costo-pallet').value.trim();
+            if (!sku || !proveedor || !lote || !fechaVencimiento || !cantidadPallets || !fechaIngreso || !costoPallet) {
+                document.getElementById('prep-register-message').textContent = 'Complete todos los campos de la preparación.';
+                return;
+            }
+            const idEntrada = getNextPreparacionId();
+            const resultado = await fetchN8n('register_preparacion', {
+                ID_entrada: idEntrada,
+                SKU: sku,
+                proveedor,
+                lote,
+                fecha_vencimiento_lote: fechaVencimiento,
+                cantidad_pallets: cantidadPallets,
+                fecha_ingreso: fechaIngreso,
+                costo_por_pallet: costoPallet,
+                estado: 'Pendiente',
+                motivo_rechazo: '',
+                cantidad_rechazada: '',
+                usuario: activeUser.correo_electronico || activeUser.nombre || 'Usuario'
+            });
+            if (resultado.exito) {
+                document.getElementById('prep-register-message').textContent = `Preparación registrada: ${idEntrada}`;
+                document.getElementById('preparacion-form').reset();
+                cargarPreparacionesRecepcion();
+            } else {
+                document.getElementById('prep-register-message').textContent = resultado.error || 'No se pudo registrar la preparación.';
+            }
+        }
+
+        function initApp() {
+            showAuthPanel('login');
+            document.body.classList.add('overflow-hidden');
+            document.getElementById('login-form').addEventListener('submit', loginUser);
+            document.getElementById('register-form').addEventListener('submit', registerUser);
+            document.getElementById('reset-form').addEventListener('submit', resetPassword);
+            document.getElementById('preparacion-form').addEventListener('submit', registrarPreparacion);
+        }
+
+        // Función para capitalizar nombres
+        function capitalizarProducto(nombre) {
+            return nombre.split(' ').map(palabra => 
+                palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase()
+            ).join(' ');
+        }
+        
+        // Calular desviación estándar
+        function calcularDesviacionEstandar(datos) {
+            if (datos.length === 0) return 0;
+            const promedio = datos.reduce((a, b) => a + b, 0) / datos.length;
+            const varianza = datos.reduce((sum, valor) => sum + Math.pow(valor - promedio, 2), 0) / datos.length;
+            return Math.sqrt(varianza);
+        }
+
+        // Set today's date in entrada-fecha
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('entrada-fecha').value = hoy;
+
+        // Manejo de checkbox para pallets
+        document.getElementById('entrada-es-pallet').addEventListener('change', function() {
+            const palletSection = document.getElementById('entrada-pallet-section');
+            if (this.checked) {
+                palletSection.classList.remove('hidden');
+            } else {
+                palletSection.classList.add('hidden');
+                document.getElementById('pallet-summary').textContent = 'Ingrese los datos para ver el resumen';
+            }
+        });
+
+        // Actualizar resumen de pallet en tiempo real
+        ['entrada-cantidad-pallets', 'entrada-altura-pallet', 'entrada-peso-pallet'].forEach(id => {
+            document.getElementById(id).addEventListener('input', function() {
+                const cantPallets = document.getElementById('entrada-cantidad-pallets').value || 0;
+                const altura = document.getElementById('entrada-altura-pallet').value || 0;
+                const peso = document.getElementById('entrada-peso-pallet').value || 0;
+                
+                if (cantPallets && altura && peso) {
+                    const pesoTotal = (cantPallets * peso).toFixed(2);
+                    const alturaTotal = (cantPallets * altura).toFixed(2);
+                    document.getElementById('pallet-summary').innerHTML = `
+                        <div class="space-y-1">
+                            <div>📦 Pallets: <strong>${cantPallets}</strong></div>
+                            <div>📏 Altura Total: <strong>${alturaTotal} cm</strong> (${(alturaTotal / 100).toFixed(2)} m)</div>
+                            <div>⚖️ Peso Total: <strong>${pesoTotal} kg</strong> (${(pesoTotal / 1000).toFixed(2)} toneladas)</div>
+                        </div>
+                    `;
+                }
+            });
+        });
+
+        // Tab management
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-cyan-500', 'text-white');
+                btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+            });
+            
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            document.getElementById(tabName + '-tab').classList.add('fade-in');
+            
+            const activeBtn = document.getElementById('tab-' + tabName);
+            activeBtn.classList.add('bg-cyan-500', 'text-white');
+            activeBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+            
+            if (tabName === 'dashboard') updateDashboard();
+            if (tabName === 'preparacion') cargarPreparacionesRecepcion();
+            if (tabName === 'inventory') updateInventoryTable();
+            if (tabName === 'transactions') updateTransactionsTable();
+            if (tabName === 'proveedores') actualizarProveedoresEvaluados();
+            if (tabName === 'reportes') actualizarReportes();
+        }
+
+        // Calculate daily demand from historical data
+        function calcularDemandaDiaria(nombreProducto) {
+            const transaccionesSalida = registroTransacciones.filter(t => 
+                t.producto === nombreProducto && t.tipo === 'Salida'
+            );
+            
+            if (transaccionesSalida.length === 0) {
+                return 1;
+            }
+            
+            const ventasPorDia = {};
+            transaccionesSalida.forEach(trans => {
+                const fecha = trans.fecha_hora.split(' ')[0];
+                ventasPorDia[fecha] = (ventasPorDia[fecha] || 0) + trans.cantidad;
+            });
+            
+            const diasConVentas = Object.keys(ventasPorDia).length;
+            const totalVendido = Object.values(ventasPorDia).reduce((sum, cantidad) => sum + cantidad, 0);
+            
+            if (diasConVentas === 0) return 1;
+            
+            const demandaPromedio = totalVendido / diasConVentas;
+            return Math.max(1, Math.round(demandaPromedio));
+        }
+
+        // Calculate stock metrics
+        function calcularMetricasStock(productoData, nombreProducto) {
+            const demandaDiaria = calcularDemandaDiaria(nombreProducto);
+            productoData.demanda_diaria = demandaDiaria;
+            
+            const costoUnitario = productoData.lotes.length > 0 ? productoData.lotes[0].precio_unitario : 0;
+
+            const stockSeguridad = demandaDiaria * DIAS_CUBRIR_SEGURIDAD;
+            const stockMinimo = stockSeguridad + (demandaDiaria * 3);
+
+            const demandaAnual = demandaDiaria * DIAS_LABORABLES_ANUALES;
+            const costoMantenimientoUnitario = costoUnitario * COSTO_MANTENIMIENTO_ANUAL_PCT;
+            
+            let EOQ = 0;
+            if (demandaAnual > 0 && costoMantenimientoUnitario > 0) {
+                EOQ = Math.sqrt((2 * demandaAnual * COSTO_PEDIDO_FIJO) / costoMantenimientoUnitario);
+            }
+
+            productoData.stock_seguridad = Math.round(stockSeguridad);
+            productoData.stock_minimo = Math.round(stockMinimo);
+            productoData.punto_reorden = Math.round(stockMinimo);
+            productoData.eoq = Math.round(EOQ);
+        }
+
+        // Get total stock
+        function getStockTotal(productoData) {
+            return productoData.lotes.reduce((total, lote) => total + lote.cantidad, 0);
+        }
+
+        // Register transaction
+        function registrarLog(nombre, cantidad, precio, tipo, razon = null, pallets = '-') {
+            const ahora = new Date();
+            const log = {
+                fecha_hora: ahora.toLocaleString('es-ES'),
+                producto: nombre,
+                cantidad: Math.abs(cantidad),
+                precio_unitario: precio,
+                costo_total: Math.abs(cantidad) * precio,
+                tipo: tipo,
+                razon: razon || "N/A",
+                pallets: pallets
+            };
+            registroTransacciones.unshift(log);
+            
+            // Agregar al historial de movimientos en Google Sheets (invisible para usuario)
+            agregarHistorialMovimiento(log);
+        }
+
+        // Calcular total de pallets en lotes
+        function calcularTotalPallets(lotes) {
+            let totalPallets = 0;
+            lotes.forEach(lote => {
+                if (lote.datos_pallet) {
+                    totalPallets += lote.datos_pallet.cantidad_pallets;
+                }
+            });
+            return totalPallets;
+        }
+
+        // Descargar plantilla Excel profesional con formato y validaciones
+        function descargarPlantilla() {
+            try {
+                // Crear workbook con múltiples hojas
+                const wb = XLSX.utils.book_new();
+                
+                // ========== HOJA 1: PLANTILLA DE CARGA ==========
+                const plantillaData = [
+                    ['PLANTILLA DE CARGA MASIVA - GESTIÓN DE INVENTARIO ESMAX', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                    ['Realizado en:', new Date().toLocaleString('es-ES'), '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                    ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                    // Encabezados con información
+                    ['Nombre del Producto*', 'SKU*', 'GTIN13', 'Tipo Inventario*', 'Metodo Almacenamiento*', 'Peligrosidad*', 'Unidad Medida*', 'Cantidad*', 'Precio Unitario ($)*', 'Tipo Documento*', 'Numero Documento*', 'Proveedor*', 'Lote*', 'Calidad Entrega*', 'Fecha Vencimiento', 'Fecha Entrada*', 'Es Pallet*', 'Cantidad Pallets', 'Altura Pallet (cm)', 'Peso Pallet (kg)'],
+                    // Ejemplos
+                    ['Harina de Trigo', 'SKU001', '1234567890123', 'Materia Prima', 'FIFO (PEPS)', 'No Peligroso', 'Unidad', 100, 10.50, 'Factura', 'FAC001', 'Proveedor A', 'LOTE001', 'Buena', '2025-12-31', '2024-01-15', 'No', '', '', ''],
+                    ['Aceite Vegetal', 'SKU002', '9876543210987', 'Producto Terminado', 'LIFO (UEPS)', 'No Peligroso', 'Caja', 500, 5.25, 'Factura', 'FAC002', 'Proveedor B', 'LOTE002', 'Buena', '2025-06-30', '2024-01-15', 'Si', 5, 145.5, 1000],
+                    ['Leche Fresca', 'SKU003', '5555555555555', 'Materia Prima', 'FEFO', 'No Peligroso', 'Unidad', 200, 8.99, 'Factura', 'FAC003', 'Proveedor C', 'LOTE003', 'Buena', '2024-03-15', '2024-01-15', 'No', '', '', ''],
+                    ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], // Fila vacía para separación
+                ];
+                
+                // Convertir a sheet
+                const ws_plantilla = XLSX.utils.aoa_to_sheet(plantillaData);
+                
+                // Formatear encabezados (fila 4)
+                const headerStyle = {
+                    fill: { fgColor: { rgb: 'FF0F766E' } }, // Color ESMAX oscuro
+                    font: { bold: true, color: { rgb: 'FFFFFFFF' }, sz: 11 },
+                    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                    border: {
+                        top: { style: 'thin', color: { rgb: 'FF000000' } },
+                        bottom: { style: 'thin', color: { rgb: 'FF000000' } },
+                        left: { style: 'thin', color: { rgb: 'FF000000' } },
+                        right: { style: 'thin', color: { rgb: 'FF000000' } }
+                    }
+                };
+                
+                // Aplicar estilos a encabezados
+                for (let i = 0; i < 20; i++) {
+                    const cellRef = XLSX.utils.encode_cell({ r: 3, c: i });
+                    if (!ws_plantilla[cellRef]) ws_plantilla[cellRef] = {};
+                    ws_plantilla[cellRef].s = headerStyle;
+                }
+                
+                // Formatear título
+                ws_plantilla['A1'].s = {
+                    font: { bold: true, sz: 14, color: { rgb: 'FF0F766E' } },
+                    alignment: { horizontal: 'left' }
+                };
+                
+                // Ancho de columnas
+                ws_plantilla['!cols'] = [
+                    { wch: 20 }, // A
+                    { wch: 12 }, // B
+                    { wch: 14 }, // C
+                    { wch: 18 }, // D
+                    { wch: 20 }, // E
+                    { wch: 14 }, // F
+                    { wch: 14 }, // G
+                    { wch: 10 }, // H
+                    { wch: 14 }, // I
+                    { wch: 16 }, // J
+                    { wch: 14 }, // K
+                    { wch: 14 }, // L
+                    { wch: 10 }, // M
+                    { wch: 14 }, // N
+                    { wch: 16 }, // O
+                    { wch: 16 }, // P
+                    { wch: 12 }, // Q
+                    { wch: 14 }, // R
+                    { wch: 16 }, // S
+                    { wch: 14 }  // T
+                ];
+                
+                // ========== HOJA 2: INSTRUCCIONES ==========
+                const instructionsData = [
+                    ['INSTRUCCIONES Y VALORES PERMITIDOS', '', ''],
+                    ['', '', ''],
+                    ['CAMPOS OBLIGATORIOS (marcados con *)', '', ''],
+                    ['- Nombre del Producto', 'Nombre descriptivo del producto (ej: Harina de Trigo)', ''],
+                    ['- SKU', 'Código único del producto (ej: SKU001)', ''],
+                    ['- Tipo Inventario', 'Ver pestaña Valores Permitidos', ''],
+                    ['- Metodo Almacenamiento', 'FIFO (PEPS), LIFO (UEPS), FEFO, Estantería, Pallet, Refrigerado, Congelado', ''],
+                    ['- Peligrosidad', 'Ver pestaña Valores Permitidos', ''],
+                    ['- Unidad Medida', 'Ver pestaña Valores Permitidos', ''],
+                    ['- Cantidad', 'Número entero positivo (ej: 100)', ''],
+                    ['- Precio Unitario', 'Precio en dólares (ej: 10.50)', ''],
+                    ['- Tipo Documento', 'Factura, Nota de Crédito, Remisión, Orden de Compra', ''],
+                    ['- Numero Documento', 'Número del documento (ej: FAC001)', ''],
+                    ['- Proveedor', 'Nombre del proveedor', ''],
+                    ['- Lote', 'Código de lote (ej: LOTE001)', ''],
+                    ['- Calidad Entrega', 'Buena, Regular, Deficiente', ''],
+                    ['- Fecha Entrada', 'Formato YYYY-MM-DD (ej: 2024-01-15)', ''],
+                    ['- Es Pallet', 'Si o No (Si selecciona Si, complete datos de pallet)', ''],
+                    ['', '', ''],
+                    ['CAMPOS OPCIONALES', '', ''],
+                    ['- GTIN13', 'Código EAN/UPC de 13 dígitos (opcional)', ''],
+                    ['- Fecha Vencimiento', 'Formato YYYY-MM-DD (ej: 2025-12-31)', ''],
+                    ['- Cantidad Pallets', 'Requerido si Es Pallet = Si', ''],
+                    ['- Altura Pallet (cm)', 'Requerido si Es Pallet = Si', ''],
+                    ['- Peso Pallet (kg)', 'Requerido si Es Pallet = Si', ''],
+                    ['', '', ''],
+                    ['METODOS DE ALMACENAMIENTO', '', ''],
+                    ['FIFO (PEPS)', 'Primero Entra Primero Sale - Ideal para productos perecederos', ''],
+                    ['LIFO (UEPS)', 'Último Entra Primero Sale - Para materiales no perecederos', ''],
+                    ['FEFO', 'Primero Expira Primero Sale - Para productos con fecha de vencimiento', ''],
+                    ['Estantería', 'Almacenamiento en estantes convencionales', ''],
+                    ['Pallet', 'Almacenamiento en pallets', ''],
+                    ['Refrigerado', 'Almacenamiento en ambiente refrigerado', ''],
+                    ['Congelado', 'Almacenamiento en ambiente congelado', ''],
+                ];
+                
+                const ws_instructions = XLSX.utils.aoa_to_sheet(instructionsData);
+                ws_instructions['!cols'] = [{ wch: 30 }, { wch: 50 }, { wch: 20 }];
+                
+                // ========== HOJA 3: VALORES PERMITIDOS ==========
+                const valoresData = [
+                    ['VALORES PERMITIDOS POR CAMPO', '', ''],
+                    ['', '', ''],
+                    ['TIPO DE INVENTARIO', '', ''],
+                    ['Materia Prima', '', ''],
+                    ['Producto Terminado', '', ''],
+                    ['Repuesto', '', ''],
+                    ['Insumo', '', ''],
+                    ['', '', ''],
+                    ['PELIGROSIDAD', '', ''],
+                    ['No Peligroso', '', ''],
+                    ['Inflamable', '', ''],
+                    ['Tóxico', '', ''],
+                    ['Corrosivo', '', ''],
+                    ['', '', ''],
+                    ['UNIDAD DE MEDIDA', '', ''],
+                    ['Unidad', '', ''],
+                    ['Caja', '', ''],
+                    ['Bidón', '', ''],
+                    ['Bin', '', ''],
+                    ['Cuñete', '', ''],
+                    ['Tambor', '', ''],
+                    ['', '', ''],
+                    ['TIPO DE DOCUMENTO', '', ''],
+                    ['Factura', '', ''],
+                    ['Nota de Crédito', '', ''],
+                    ['Remisión', '', ''],
+                    ['Orden de Compra', '', ''],
+                    ['', '', ''],
+                    ['CALIDAD DE ENTREGA', '', ''],
+                    ['Buena', '', ''],
+                    ['Regular', '', ''],
+                    ['Deficiente', '', ''],
+                ];
+                
+                const ws_valores = XLSX.utils.aoa_to_sheet(valoresData);
+                ws_valores['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 20 }];
+                
+                // Agregar hojas al workbook
+                XLSX.utils.book_append_sheet(wb, ws_plantilla, 'Carga Masiva');
+                XLSX.utils.book_append_sheet(wb, ws_instructions, 'Instrucciones');
+                XLSX.utils.book_append_sheet(wb, ws_valores, 'Valores Permitidos');
+                
+                // Descargar archivo
+                const nombreArchivo = `PLANTILLA_CARGA_MASIVA_ESMAX_${new Date().toISOString().split('T')[0]}.xlsx`;
+                XLSX.writeFile(wb, nombreArchivo);
+                
+            } catch (error) {
+                console.error('Error al descargar plantilla:', error);
+                alert('❌ Error: No se pudo descargar la plantilla Excel. Intente de nuevo.');
+            }
+        }
+
+        // Procesar carga masiva desde archivo (Mejorado)
+        function procesarCargaMasiva(event) {
+            const archivo = event.target.files[0];
+            if (!archivo) return;
+
+            const extension = archivo.name.split('.').pop().toLowerCase();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    let filasOriginales = [];
+                    if (extension === 'xlsx' || extension === 'xls') {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const primeraHoja = workbook.SheetNames[0];
+                        filasOriginales = XLSX.utils.sheet_to_json(workbook.Sheets[primeraHoja], { defval: '' });
+                    } else {
+                        const contenido = e.target.result;
+                        const lineas = contenido.split('\n').filter(l => l.trim() && !l.startsWith('***'));
+                        const encabezados = lineas[0].split(',').map(h => h.trim());
+                        filasOriginales = lineas.slice(1).map(linea => {
+                            const valores = linea.split(',').map(v => v.trim());
+                            const fila = {};
+                            encabezados.forEach((enc, idx) => {
+                                fila[enc] = valores[idx] || '';
+                            });
+                            return fila;
+                        });
+                    }
+
+                    let registrosValidos = 0;
+                    let errores = [];
+                    const valoresValidos = {
+                        tipoInventario: ['materia prima', 'producto terminado', 'repuesto', 'insumo'],
+                        metodoAlmacenamiento: ['fifo (peps)', 'lifo (ueps)', 'fefo', 'estantería', 'pallet', 'refrigerado', 'congelado'],
+                        peligrosidad: ['no peligroso', 'inflamable', 'tóxico', 'corrosivo'],
+                        unidad: ['unidad', 'caja', 'bidón', 'bin', 'cuñete', 'tambor'],
+                        tipoDoc: ['factura', 'nota de crédito', 'remisión', 'orden de compra'],
+                        calidad: ['buena', 'regular', 'deficiente'],
+                        esPallet: ['si', 'no']
+                    };
+
+                    filasOriginales.forEach((filaOriginal, index) => {
+                        const fila = {};
+                        Object.entries(filaOriginal).forEach(([clave, valor]) => {
+                            const nombreCampo = clave.toLowerCase().trim().replace(/[\*()]/g, '');
+                            fila[nombreCampo] = String(valor).trim();
+                        });
+
+                        try {
+                            let nombre = fila['nombre del producto'] || '';
+                            nombre = capitalizarProducto(nombre);
+                            const sku = (fila['sku'] || '').toUpperCase();
+                            const gtin13 = fila['gtin13'] || '';
+                            const tipoInventario = fila['tipo inventario'] || 'Materia Prima';
+                            const metodoAlmacenamiento = fila['metodo almacenamiento'] || 'FIFO (PEPS)';
+                            const peligrosidad = fila['peligrosidad'] || 'No Peligroso';
+                            const unidad = fila['unidad medida'] || 'Unidad';
+                            const cantidad = parseInt(fila['cantidad']) || 0;
+                            const precio = parseFloat(fila['precio unitario']) || 0;
+                            const tipoDoc = fila['tipo documento'] || 'Factura';
+                            const numeroDoc = fila['numero documento'] || '';
+                            const proveedor = fila['proveedor'] || '';
+                            const lote = fila['lote'] || '';
+                            const calidad = fila['calidad entrega'] || 'Buena';
+                            const vencimiento = fila['fecha vencimiento (yyyy-mm-dd)'] || '';
+                            const fecha = fila['fecha entrada (yyyy-mm-dd)'] || hoy;
+                            const esPallet = (fila['es pallet (si/no)'] || 'No').toLowerCase() === 'si';
+
+                            if (!nombre || !sku || cantidad <= 0 || precio <= 0) {
+                                errores.push(`Fila ${index + 2}: Producto "${nombre}" - Datos básicos incompletos o inválidos`);
+                                return;
+                            }
+                            if (!valoresValidos.tipoInventario.includes(tipoInventario.toLowerCase())) {
+                                errores.push(`Fila ${index + 2}: Tipo de inventario "${tipoInventario}" no válido`);
+                                return;
+                            }
+                            if (!valoresValidos.metodoAlmacenamiento.includes(metodoAlmacenamiento.toLowerCase())) {
+                                errores.push(`Fila ${index + 2}: Método de almacenamiento "${metodoAlmacenamiento}" no válido. Use: FIFO (PEPS), LIFO (UEPS), FEFO, Estantería, Pallet, Refrigerado o Congelado`);
+                                return;
+                            }
+
+                            let skuDuplicado = false;
+                            for (const [prodNombre, prodData] of Object.entries(inventario)) {
+                                if (prodData.sku === sku && prodNombre !== nombre) {
+                                    skuDuplicado = true;
+                                    break;
+                                }
+                            }
+                            if (skuDuplicado) {
+                                errores.push(`Fila ${index + 2}: SKU "${sku}" ya existe para otro producto`);
+                                return;
+                            }
+
+                            let datosPallet = null;
+                            if (esPallet) {
+                                const cantPallets = parseInt(fila['cantidad pallets']) || 1;
+                                const altura = parseFloat(fila['altura pallet (cm)']) || 0;
+                                const peso = parseFloat(fila['peso pallet (kg)']) || 0;
+                                if (cantPallets <= 0 || altura <= 0 || peso <= 0) {
+                                    errores.push(`Fila ${index + 2}: Datos de pallet incompletos o inválidos`);
+                                    return;
+                                }
+                                datosPallet = {
+                                    cantidad_pallets: cantPallets,
+                                    altura_pallet_cm: altura,
+                                    peso_pallet_kg: peso,
+                                    peso_total_kg: cantPallets * peso,
+                                    altura_total_cm: cantPallets * altura
+                                };
+                            }
+
+                            if (!inventario[nombre]) {
+                                inventario[nombre] = {
+                                    sku: sku,
+                                    gtin13: gtin13,
+                                    tipo_inventario: tipoInventario,
+                                    metodo_almacenamiento: metodoAlmacenamiento,
+                                    peligrosidad: peligrosidad,
+                                    unidad: unidad,
+                                    demanda_diaria: 1,
+                                    lotes: [],
+                                    info_proveedor: {
+                                        nombre: proveedor,
+                                        tipo_doc: tipoDoc,
+                                        numero_doc: numeroDoc
+                                    }
+                                };
+                            }
+
+                            inventario[nombre].lotes.push({
+                                cantidad: cantidad,
+                                precio_unitario: precio,
+                                vencimiento: vencimiento || null,
+                                lote: lote,
+                                calidad_entrega: calidad,
+                                fecha_entrada: fecha,
+                                proveedor: proveedor,
+                                datos_pallet: datosPallet
+                            });
+
+                            calcularMetricasStock(inventario[nombre], nombre);
+                            registrarLog(nombre, cantidad, precio, 'Entrada', 'Carga Masiva', datosPallet ? datosPallet.cantidad_pallets : '-');
+                            registrosValidos++;
+
+                        } catch (error) {
+                            errores.push(`Fila ${index + 2}: ${error.message}`);
+                        }
+                    });
+
+                    let mensaje = `✅ Carga Masiva Completada!\n\n📦 Productos registrados: ${registrosValidos}`;
+                    if (errores.length > 0) {
+                        mensaje += `\n\n⚠️ Se encontraron ${errores.length} error(es):\n${errores.slice(0, 10).join('\n')}`;
+                        if (errores.length > 10) mensaje += `\n... y ${errores.length - 10} error(es) más`;
+                    }
+
+                    alert(mensaje);
+                    document.getElementById('archivo-carga-masiva').value = '';
+                    updateDashboard();
+                    updateInventoryTable();
+                    updateTransactionsTable();
+                    sincronizarConGoogleSheets();
+
+                } catch (error) {
+                    alert(`❌ Error al procesar archivo: ${error.message}`);
+                }
+            };
+
+            if (extension === 'xlsx' || extension === 'xls') {
+                reader.readAsArrayBuffer(archivo);
+            } else {
+                reader.readAsText(archivo);
+            }
+        }
+
+        // Exportar inventario a Excel
+        function exportarInventarioExcel() {
+            let csv = 'Producto,SKU,GTIN13,Stock Total,Pallets,Stock Minimo,Demanda Diaria,EOQ,Valor Total,Precio Promedio,Tipo Inventario,Metodo Almacenamiento,Peligrosidad\n';
+
+            Object.entries(inventario).forEach(([nombre, data]) => {
+                const stock = getStockTotal(data);
+                const totalPallets = calcularTotalPallets(data.lotes);
+                const valorTotal = data.lotes.reduce((t, l) => t + (l.cantidad * l.precio_unitario), 0);
+                const precioPromedio = stock > 0 ? (valorTotal / stock).toFixed(2) : '0';
+
+                csv += `"${nombre}","${data.sku}","${data.gtin13}",${stock},${totalPallets},${data.stock_minimo},${data.demanda_diaria},${data.eoq},"$${valorTotal.toFixed(2)}","$${precioPromedio}","${data.tipo_inventario}","${data.metodo_almacenamiento}","${data.peligrosidad}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `inventario_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // Entrada form handler
+        document.getElementById('entrada-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            let nombre = document.getElementById('entrada-nombre').value.trim();
+            nombre = capitalizarProducto(nombre); // Capitalizar nombre
+            
+            const sku = document.getElementById('entrada-sku').value.trim().toUpperCase();
+            const gtin13 = document.getElementById('entrada-gtin13').value.trim();
+            const tipoInventario = document.getElementById('entrada-tipo-inventario').value;
+            const metodoAlmacenamiento = document.getElementById('entrada-metodo').value;
+            const peligrosidad = document.getElementById('entrada-peligrosidad').value;
+            const unidad = document.getElementById('entrada-unidad').value;
+            const cantidad = parseInt(document.getElementById('entrada-cantidad').value);
+            const precio = parseFloat(document.getElementById('entrada-precio').value);
+            const tipoDoc = document.getElementById('entrada-tipo-doc').value;
+            const numeroDoc = document.getElementById('entrada-numero-doc').value;
+            const proveedor = document.getElementById('entrada-proveedor').value;
+            const lote = document.getElementById('entrada-lote').value;
+            const calidad = document.getElementById('entrada-calidad').value;
+            const vencimiento = document.getElementById('entrada-vencimiento').value;
+            const fecha = document.getElementById('entrada-fecha').value;
+            
+            // Validar datos de pallet si está activo
+            let datosPallet = null;
+            if (document.getElementById('entrada-es-pallet').checked) {
+                const cantPallets = document.getElementById('entrada-cantidad-pallets').value;
+                const altura = document.getElementById('entrada-altura-pallet').value;
+                const peso = document.getElementById('entrada-peso-pallet').value;
+                
+                if (!cantPallets || !altura || !peso) {
+                    alert('❌ Complete todos los datos del pallet (cantidad, altura, peso)');
+                    return;
+                }
+                
+                datosPallet = {
+                    cantidad_pallets: parseInt(cantPallets),
+                    altura_pallet_cm: parseFloat(altura),
+                    peso_pallet_kg: parseFloat(peso),
+                    peso_total_kg: parseFloat(cantPallets) * parseFloat(peso),
+                    altura_total_cm: parseFloat(cantPallets) * parseFloat(altura)
+                };
+            }
+
+            if (!nombre || !sku || !cantidad || !precio) {
+                alert('❌ Complete los campos obligatorios');
+                return;
+            }
+
+            // Validar que no haya SKU duplicado con nombre diferente
+            for (const [prodNombre, prodData] of Object.entries(inventario)) {
+                if (prodData.sku === sku && prodNombre !== nombre) {
+                    alert(`❌ El SKU "${sku}" ya existe para el producto "${prodNombre}". Los SKU deben ser únicos.`);
+                    return;
+                }
+            }
+
+            if (!inventario[nombre]) {
+                inventario[nombre] = {
+                    sku: sku,
+                    gtin13: gtin13,
+                    tipo_inventario: tipoInventario,
+                    metodo_almacenamiento: metodoAlmacenamiento,
+                    peligrosidad: peligrosidad,
+                    unidad: unidad,
+                    demanda_diaria: 1,
+                    lotes: [],
+                    info_proveedor: {
+                        nombre: proveedor,
+                        tipo_doc: tipoDoc,
+                        numero_doc: numeroDoc
+                    }
+                };
+            }
+
+            // Add new batch (FIFO - First In First Out)
+            inventario[nombre].lotes.push({
+                cantidad: cantidad,
+                precio_unitario: precio,
+                vencimiento: vencimiento || null,
+                lote: lote,
+                calidad_entrega: calidad,
+                fecha_entrada: fecha,
+                proveedor: proveedor,
+                datos_pallet: datosPallet
+            });
+
+            // No ordenar - FIFO mantiene orden de entrada
+            
+            calcularMetricasStock(inventario[nombre], nombre);
+            registrarLog(nombre, cantidad, precio, 'Entrada', 'Compra', datosPallet ? datosPallet.cantidad_pallets : '-');
+            document.getElementById('entrada-fecha').value = hoy;
+            document.getElementById('entrada-es-pallet').checked = false;
+            document.getElementById('entrada-pallet-section').classList.add('hidden');
+            document.getElementById('pallet-summary').textContent = 'Ingrese los datos para ver el resumen';
+            
+            alert(`✅ Entrada registrada: ${cantidad} ${unidad} de ${nombre}${datosPallet ? ` (${datosPallet.cantidad_pallets} pallets)` : ''}`);
+            updateDashboard();
+            
+            // Sincronizar con Google Sheets (invisible para usuario)
+            sincronizarConGoogleSheets();
+        });
+
+        // Buscar producto para salida
+        function buscarProductoSalida() {
+            const busqueda = document.getElementById('salida-busqueda').value.trim().toLowerCase();
+            
+            if (!busqueda) {
+                alert('❌ Ingrese SKU o nombre del producto');
+                return;
+            }
+
+            let encontrado = null;
+            for (const [nombre, data] of Object.entries(inventario)) {
+                if (nombre.toLowerCase().includes(busqueda) || data.sku.toLowerCase().includes(busqueda)) {
+                    encontrado = { nombre, data };
+                    break;
+                }
+            }
+
+            if (!encontrado) {
+                alert('❌ Producto no encontrado');
+                document.getElementById('salida-resultado').classList.add('hidden');
+                document.getElementById('salida-cantidad-section').classList.add('hidden');
+                document.getElementById('salida-button-section').classList.add('hidden');
+                return;
+            }
+
+            productoSalidaBuscado = encontrado;
+            const stock = getStockTotal(encontrado.data);
+            
+            document.getElementById('producto-info').innerHTML = `
+                <div class="font-semibold text-teal-800">${encontrado.nombre}</div>
+                <div class="text-sm text-gray-600">SKU: ${encontrado.data.sku}</div>
+                <div class="text-sm text-gray-600">Unidad: ${encontrado.data.unidad}</div>
+            `;
+            document.getElementById('stock-disponible').textContent = `Stock disponible: ${stock} ${encontrado.data.unidad}`;
+            document.getElementById('salida-cantidad').max = stock;
+            
+            document.getElementById('salida-resultado').classList.remove('hidden');
+            document.getElementById('salida-cantidad-section').classList.remove('hidden');
+            document.getElementById('salida-button-section').classList.remove('hidden');
+        }
+
+        // Process sale using FIFO
+        function procesarSalida(nombreProducto, cantidadVender, razon, palletsSalida = 0) {
+            const producto = inventario[nombreProducto];
+            let cantidadRestante = cantidadVender;
+            let costoTotalVenta = 0;
+            
+            // FIFO: vender del primer lote (primero en entrar)
+            for (let i = 0; i < producto.lotes.length && cantidadRestante > 0; i++) {
+                const lote = producto.lotes[i];
+                const cantidadDelLote = Math.min(lote.cantidad, cantidadRestante);
+                
+                costoTotalVenta += cantidadDelLote * lote.precio_unitario;
+                lote.cantidad -= cantidadDelLote;
+                cantidadRestante -= cantidadDelLote;
+                
+                if (lote.cantidad === 0) {
+                    producto.lotes.splice(i, 1);
+                    i--;
+                }
+            }
+            
+            const costoPromedioVenta = costoTotalVenta / cantidadVender;
+            const palletInfo = palletsSalida > 0 ? palletsSalida : '-';
+            registrarLog(nombreProducto, cantidadVender, costoPromedioVenta, 'Salida', razon, palletInfo);
+            
+            calcularMetricasStock(producto, nombreProducto);
+            
+            return cantidadRestante === 0;
+        }
+
+        // Salida form handler
+        document.getElementById('salida-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (!productoSalidaBuscado) {
+                alert('❌ Busque un producto primero');
+                return;
+            }
+
+            const cantidadVender = parseInt(document.getElementById('salida-cantidad').value);
+            const palletsSalida = parseInt(document.getElementById('salida-pallets').value) || 0;
+            const razon = document.getElementById('salida-razon').value;
+            const stockDisponible = getStockTotal(productoSalidaBuscado.data);
+            
+            if (cantidadVender > stockDisponible) {
+                alert(`❌ No hay suficiente stock. Disponible: ${stockDisponible}`);
+                return;
+            }
+            
+            if (procesarSalida(productoSalidaBuscado.nombre, cantidadVender, razon, palletsSalida)) {
+                let mensaje = `✅ Salida registrada: ${cantidadVender} unidades de ${productoSalidaBuscado.nombre}`;
+                if (palletsSalida > 0) {
+                    mensaje += ` (${palletsSalida} pallets)`;
+                }
+                alert(mensaje);
+                document.getElementById('salida-form').reset();
+                document.getElementById('salida-resultado').classList.add('hidden');
+                document.getElementById('salida-cantidad-section').classList.add('hidden');
+                document.getElementById('salida-button-section').classList.add('hidden');
+                productoSalidaBuscado = null;
+                updateDashboard();
+                updateInventoryTable();
+                updateTransactionsTable();
+                
+                // Sincronizar con Google Sheets (invisible para usuario)
+                sincronizarConGoogleSheets();
+            } else {
+                alert('❌ Error al procesar la salida');
+            }
+        });
+
+        // Update dashboard
+        function updateDashboard() {
+            const totalProducts = Object.keys(inventario).length;
+            let totalStock = 0;
+            let expiringSoon = 0;
+            let lowStock = 0;
+            const alerts = [];
+
+            const today = new Date();
+            const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+            Object.entries(inventario).forEach(([nombre, data]) => {
+                const stock = getStockTotal(data);
+                totalStock += stock;
+
+                // Check expiring products
+                data.lotes.forEach(lote => {
+                    if (lote.vencimiento) {
+                        const expiryDate = new Date(lote.vencimiento);
+                        if (expiryDate <= sevenDaysFromNow && expiryDate > today) {
+                            expiringSoon += lote.cantidad;
+                            alerts.push({
+                                type: 'warning',
+                                message: `⚠️ ${nombre} vence el ${lote.vencimiento}. Stock: ${lote.cantidad} unidades`
+                            });
+                        } else if (expiryDate <= today) {
+                            alerts.push({
+                                type: 'danger',
+                                message: `🚨 ${nombre} VENCIDO desde ${lote.vencimiento}. ${lote.cantidad} unidades (revisar inmediatamente)`
+                            });
+                        }
+                    }
+                });
+
+                // Check low stock
+                if (stock <= data.stock_seguridad) {
+                    alerts.push({
+                        type: 'danger',
+                        message: `🚨 ${nombre} alcanzó STOCK DE SEGURIDAD (${stock}/${data.stock_seguridad} unidades). REORDENAR URGENTE: ${data.eoq} unidades`
+                    });
+                    lowStock++;
+                } else if (stock <= data.stock_minimo) {
+                    alerts.push({
+                        type: 'warning',
+                        message: `⚠️ ${nombre} está por debajo del mínimo (${stock}/${data.stock_minimo}). Sugerencia: ordenar ${data.eoq} unidades`
+                    });
+                }
+            });
+
+            document.getElementById('total-products').textContent = totalProducts;
+            document.getElementById('total-stock').textContent = totalStock;
+            document.getElementById('expiring-soon').textContent = expiringSoon;
+            document.getElementById('low-stock').textContent = lowStock;
+
+            const alertsContainer = document.getElementById('alerts-container');
+            if (alerts.length === 0) {
+                alertsContainer.innerHTML = `
+                    <div class="bg-emerald-50 border-l-4 border-emerald-400 p-4 rounded-r-lg">
+                        <p class="text-emerald-700">✅ Todo el inventario está en buen estado</p>
+                    </div>
+                `;
+            } else {
+                alertsContainer.innerHTML = alerts.map(alert => `
+                    <div class="bg-${alert.type === 'danger' ? 'red' : 'yellow'}-50 border-l-4 border-${alert.type === 'danger' ? 'red' : 'yellow'}-400 p-4 rounded-r-lg">
+                        <p class="text-${alert.type === 'danger' ? 'red' : 'yellow'}-700">${alert.message}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Update inventory table
+        function updateInventoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            
+            if (Object.keys(inventario).length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                            📦 No hay productos en el inventario
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = Object.entries(inventario).map(([nombre, data]) => {
+                const stock = getStockTotal(data);
+                let status = 'success';
+                let statusText = 'Normal';
+                let statusColor = 'green';
+
+                if (stock <= data.stock_seguridad) {
+                    status = 'danger';
+                    statusText = 'Stock Crítico';
+                    statusColor = 'red';
+                } else if (stock <= data.stock_minimo) {
+                    status = 'warning';
+                    statusText = 'Stock Bajo';
+                    statusColor = 'yellow';
+                }
+
+                return `
+                    <tr class="hover:bg-cyan-50">
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">${nombre}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${data.sku}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-teal-700">${stock}</td>
+                        <td class="px-6 py-4 text-sm text-blue-600 font-medium">${calcularTotalPallets(data.lotes)} 📦</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${data.stock_minimo}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${data.demanda_diaria}/día</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${data.eoq}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-${statusColor}-100 text-${statusColor}-800">
+                                ${statusText}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button onclick="showProductDetails('${nombre}')" class="text-cyan-600 hover:text-cyan-900 text-sm font-medium">
+                                Ver Detalles
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Update transactions table
+        function updateTransactionsTable() {
+            const tbody = document.getElementById('transactions-table-body');
+            
+            if (registroTransacciones.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            📝 No hay transacciones registradas
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = registroTransacciones.slice(0, 50).map(trans => `
+                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 text-sm text-gray-900">${trans.fecha_hora}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${trans.producto}</td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${trans.tipo === 'Entrada' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
+                            ${trans.tipo}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${trans.cantidad}</td>
+                    <td class="px-6 py-4 text-sm text-blue-600 font-medium">${trans.pallets || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">$${trans.costo_total.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${trans.razon}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Show product details
+        function showProductDetails(nombre) {
+            const data = inventario[nombre];
+            const stock = getStockTotal(data);
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+                    <div class="px-6 py-4 bg-gradient-to-r from-cyan-50 to-teal-50 border-b flex justify-between items-center sticky top-0">
+                        <h3 class="text-xl font-bold text-teal-800">${nombre} (${data.sku})</h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                    </div>
+                    <div class="p-6 space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-cyan-50 p-4 rounded-lg border-l-4 border-cyan-500">
+                                <h4 class="font-semibold text-cyan-800 mb-3">📊 Métricas de Stock</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between"><span>Stock Actual:</span><span class="font-medium">${stock}</span></div>
+                                    <div class="flex justify-between"><span>Stock Mínimo:</span><span class="font-medium">${data.stock_minimo}</span></div>
+                                    <div class="flex justify-between"><span>Stock de Seguridad:</span><span class="font-medium">${data.stock_seguridad}</span></div>
+                                    <div class="flex justify-between"><span>EOQ (Wilson):</span><span class="font-medium">${data.eoq}</span></div>
+                                    <div class="flex justify-between"><span>Demanda Diaria:</span><span class="font-medium">${data.demanda_diaria}/día</span></div>
+                                </div>
+                            </div>
+                            <div class="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-500">
+                                <h4 class="font-semibold text-emerald-800 mb-3">💰 Información Financiera</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between"><span>Valor Total:</span><span class="font-medium">$${data.lotes.reduce((t, l) => t + (l.cantidad * l.precio_unitario), 0).toFixed(2)}</span></div>
+                                    <div class="flex justify-between"><span>Precio Promedio:</span><span class="font-medium">$${stock > 0 ? (data.lotes.reduce((t, l) => t + (l.cantidad * l.precio_unitario), 0) / stock).toFixed(2) : '0'}</span></div>
+                                    <div class="flex justify-between"><span>Unidad:</span><span class="font-medium">${data.unidad}</span></div>
+                                    <div class="flex justify-between"><span>Proveedor:</span><span class="font-medium">${data.info_proveedor?.nombre || 'N/A'}</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-gray-400">
+                            <h4 class="font-semibold text-gray-800 mb-4">📦 Lotes Disponibles (FIFO)</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">Cant.</th>
+                                            <th class="px-3 py-2 text-left">Precio Unit.</th>
+                                            <th class="px-3 py-2 text-left">Valor</th>
+                                            <th class="px-3 py-2 text-left">Lote</th>
+                                            <th class="px-3 py-2 text-left">Entrada</th>
+                                            <th class="px-3 py-2 text-left">Vencimiento</th>
+                                            <th class="px-3 py-2 text-left">Calidad</th>
+                                            <th class="px-3 py-2 text-left">Detalles</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        ${data.lotes.map(lote => {
+                                            let vencStatus = 'Normal';
+                                            let vencColor = 'green';
+                                            if (lote.vencimiento) {
+                                                const expiryDate = new Date(lote.vencimiento);
+                                                const today = new Date();
+                                                const daysToExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                                                if (daysToExpiry <= 0) {
+                                                    vencStatus = '🚨 Vencido';
+                                                    vencColor = 'red';
+                                                } else if (daysToExpiry <= 7) {
+                                                    vencStatus = '⚠️ Próx. Vencer';
+                                                    vencColor = 'yellow';
+                                                }
+                                            }
+                                            
+                                            let detallesHTML = '-';
+                                            if (lote.datos_pallet) {
+                                                const dp = lote.datos_pallet;
+                                                detallesHTML = `
+                                                    <span title="Pallets: ${dp.cantidad_pallets}, Peso Total: ${dp.peso_total_kg}kg, Altura Total: ${dp.altura_total_cm}cm" class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded cursor-help">
+                                                        📦 ${dp.cantidad_pallets} pallets
+                                                    </span>
+                                                `;
+                                            }
+                                            
+                                            return `
+                                                <tr>
+                                                    <td class="px-3 py-2">${lote.cantidad}</td>
+                                                    <td class="px-3 py-2">$${lote.precio_unitario.toFixed(2)}</td>
+                                                    <td class="px-3 py-2">$${(lote.cantidad * lote.precio_unitario).toFixed(2)}</td>
+                                                    <td class="px-3 py-2 font-mono text-xs">${lote.lote}</td>
+                                                    <td class="px-3 py-2 text-xs">${lote.fecha_entrada}</td>
+                                                    <td class="px-3 py-2 text-xs">${lote.vencimiento || '-'}</td>
+                                                    <td class="px-3 py-2"><span class="text-xs px-2 py-1 rounded-full bg-${vencColor}-100 text-${vencColor}-800">${vencStatus}</span></td>
+                                                    <td class="px-3 py-2">${detallesHTML}</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        // ===== PROVEEDORES =====
+        
+        // Update ponderación total
+        function actualizarPonderacion() {
+            const precio = parseInt(document.getElementById('criterio-precio').value) || 0;
+            const despacho = parseInt(document.getElementById('criterio-despacho').value) || 0;
+            const pago = parseInt(document.getElementById('criterio-pago').value) || 0;
+            const confianza = parseInt(document.getElementById('criterio-confianza').value) || 0;
+            const calidad = parseInt(document.getElementById('criterio-calidad').value) || 0;
+            
+            const total = precio + despacho + pago + confianza + calidad;
+            
+            document.getElementById('total-ponderacion').textContent = total + '%';
+            
+            const estadoEl = document.getElementById('estado-ponderacion');
+            const provForm = document.getElementById('proveedor-form').querySelector('button[type="submit"]');
+            
+            if (total === 100) {
+                estadoEl.innerHTML = '✅ Válido - Suma igual a 100%';
+                estadoEl.className = 'text-sm font-medium text-green-600';
+                provForm.disabled = false;
+                provForm.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                estadoEl.innerHTML = `❌ Inválido - Suma igual a ${total}%`;
+                estadoEl.className = 'text-sm font-medium text-red-600';
+                provForm.disabled = true;
+                provForm.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Add listeners for ponderación
+        ['criterio-precio', 'criterio-despacho', 'criterio-pago', 'criterio-confianza', 'criterio-calidad'].forEach(id => {
+            document.getElementById(id).addEventListener('change', actualizarPonderacion);
+        });
+
+        // Update score display
+        function actualizarScores() {
+            document.getElementById('prov-precio-valor').textContent = document.getElementById('prov-precio').value + '/10';
+            document.getElementById('prov-despacho-valor').textContent = document.getElementById('prov-despacho').value + '/10';
+            document.getElementById('prov-pago-valor').textContent = document.getElementById('prov-pago').value + '/10';
+            document.getElementById('prov-confianza-valor').textContent = document.getElementById('prov-confianza').value + '/10';
+            document.getElementById('prov-calidad-valor').textContent = document.getElementById('prov-calidad').value + '/10';
+            
+            calcularScorePonderado();
+        }
+
+        ['prov-precio', 'prov-despacho', 'prov-pago', 'prov-confianza', 'prov-calidad'].forEach(id => {
+            document.getElementById(id).addEventListener('input', actualizarScores);
+        });
+
+        // Calculate weighted score
+        function calcularScorePonderado() {
+            const precio = parseInt(document.getElementById('prov-precio').value);
+            const despacho = parseInt(document.getElementById('prov-despacho').value);
+            const pago = parseInt(document.getElementById('prov-pago').value);
+            const confianza = parseInt(document.getElementById('prov-confianza').value);
+            const calidad = parseInt(document.getElementById('prov-calidad').value);
+            
+            const pPrecio = (parseInt(document.getElementById('criterio-precio').value) || 0) / 100;
+            const pDespacho = (parseInt(document.getElementById('criterio-despacho').value) || 0) / 100;
+            const pPago = (parseInt(document.getElementById('criterio-pago').value) || 0) / 100;
+            const pConfianza = (parseInt(document.getElementById('criterio-confianza').value) || 0) / 100;
+            const pCalidad = (parseInt(document.getElementById('criterio-calidad').value) || 0) / 100;
+            
+            const scoreTotal = (precio * pPrecio) + (despacho * pDespacho) + (pago * pPago) + (confianza * pConfianza) + (calidad * pCalidad);
+            
+            document.getElementById('score-total').textContent = scoreTotal.toFixed(1) + '/10';
+        }
+
+        // Proveedor form handler
+        document.getElementById('proveedor-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const nombre = document.getElementById('prov-nombre').value.trim();
+            
+            if (!nombre) {
+                alert('❌ Ingrese el nombre del proveedor');
+                return;
+            }
+
+            const contacto = document.getElementById('prov-contacto').value.trim();
+            const precio = parseInt(document.getElementById('prov-precio').value);
+            const despacho = parseInt(document.getElementById('prov-despacho').value);
+            const pago = parseInt(document.getElementById('prov-pago').value);
+            const confianza = parseInt(document.getElementById('prov-confianza').value);
+            const calidad = parseInt(document.getElementById('prov-calidad').value);
+            
+            const pPrecio = (parseInt(document.getElementById('criterio-precio').value)) / 100;
+            const pDespacho = (parseInt(document.getElementById('criterio-despacho').value)) / 100;
+            const pPago = (parseInt(document.getElementById('criterio-pago').value)) / 100;
+            const pConfianza = (parseInt(document.getElementById('criterio-confianza').value)) / 100;
+            const pCalidad = (parseInt(document.getElementById('criterio-calidad').value)) / 100;
+            
+            const scoreTotal = (precio * pPrecio) + (despacho * pDespacho) + (pago * pPago) + (confianza * pConfianza) + (calidad * pCalidad);
+            
+            const evaluacion = {
+                id: Date.now().toString(),
+                nombre,
+                contacto,
+                precio,
+                despacho,
+                pago,
+                confianza,
+                calidad,
+                scoreTotal,
+                fecha: new Date().toLocaleString('es-ES')
+            };
+            
+            proveedoresEvaluados.unshift(evaluacion);
+            
+            this.reset();
+            actualizarScores();
+            actualizarProveedoresEvaluados();
+            
+            alert(`✅ Evaluación guardada para ${nombre}`);
+        });
+
+        // Update proveedores list
+        function actualizarProveedoresEvaluados() {
+            const container = document.getElementById('proveedores-list');
+            
+            if (proveedoresEvaluados.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No hay proveedores evaluados aún</p>';
+                return;
+            }
+
+            container.innerHTML = proveedoresEvaluados.map(prov => {
+                const scoreColor = prov.scoreTotal >= 8 ? 'green' : prov.scoreTotal >= 6 ? 'yellow' : 'red';
+                return `
+                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border-l-4 border-indigo-500">
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div>
+                                <p class="text-sm text-gray-600">Proveedor</p>
+                                <p class="font-semibold text-gray-800">${prov.nombre}</p>
+                                <p class="text-xs text-gray-500">${prov.contacto || 'Sin contacto'}</p>
+                            </div>
+                            <div class="flex items-center justify-center">
+                                <div class="text-center">
+                                    <p class="text-xs text-gray-600">Precio</p>
+                                    <p class="text-lg font-bold text-purple-600">${prov.precio}/10</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-center">
+                                <div class="text-center">
+                                    <p class="text-xs text-gray-600">Despacho</p>
+                                    <p class="text-lg font-bold text-blue-600">${prov.despacho}/10</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-center">
+                                <div class="text-center">
+                                    <p class="text-xs text-gray-600">Confianza</p>
+                                    <p class="text-lg font-bold text-green-600">${prov.confianza}/10</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-center">
+                                <div class="text-center bg-${scoreColor}-100 px-4 py-2 rounded-lg">
+                                    <p class="text-xs text-gray-600">Score</p>
+                                    <p class="text-2xl font-bold text-${scoreColor}-600">${prov.scoreTotal.toFixed(1)}</p>
+                                    <p class="text-xs text-gray-500">${prov.fecha}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Initialize
+        actualizarPonderacion();
+        updateDashboard();
+        
+        // ===== ANÁLISIS INTELIGENTE Y REPORTES =====
+        
+        // Análisis ABC
+        function calcularAnalisisABC() {
+            const productosConValor = Object.entries(inventario).map(([nombre, data]) => {
+                const stock = getStockTotal(data);
+                const valor = stock * (data.lotes[0]?.precio_unitario || 0);
+                return { nombre, valor, stock, data };
+            }).sort((a, b) => b.valor - a.valor);
+            
+            const valorTotal = productosConValor.reduce((sum, p) => sum + p.valor, 0);
+            
+            let acumulado = 0;
+            const clasificados = productosConValor.map(p => {
+                acumulado += p.valor;
+                const porcentaje = valorTotal > 0 ? (acumulado / valorTotal) * 100 : 0;
+                let clasificacion = 'C';
+                if (porcentaje <= 80) clasificacion = 'A';
+                else if (porcentaje <= 95) clasificacion = 'B';
+                return { ...p, clasificacion, porcentajeAcumulado: porcentaje };
+            });
+            
+            return { clasificados, valorTotal };
+        }
+        
+        // Análisis ABC por Rotación
+        function calcularAnalisisRotacion() {
+            const productosConRotacion = Object.entries(inventario).map(([nombre, data]) => {
+                const transaccionesSalida = registroTransacciones.filter(t => 
+                    t.producto === nombre && t.tipo === 'Salida'
+                );
+                const rotacionAnual = transaccionesSalida.length > 0 ? 
+                    (transaccionesSalida.reduce((sum, t) => sum + t.cantidad, 0) / (getStockTotal(data) || 1)) : 0;
+                return { nombre, rotacionAnual, data };
+            }).sort((a, b) => b.rotacionAnual - a.rotacionAnual);
+            
+            const rotacionPromedio = productosConRotacion.length > 0 ?
+                productosConRotacion.reduce((sum, p) => sum + p.rotacionAnual, 0) / productosConRotacion.length : 0;
+            
+            const clasificados = productosConRotacion.map((p, idx) => {
+                let clasificacion = 'C';
+                if (idx < productosConRotacion.length * 0.3) clasificacion = 'A';
+                else if (idx < productosConRotacion.length * 0.7) clasificacion = 'B';
+                return { ...p, clasificacion };
+            });
+            
+            return { clasificados };
+        }
+        
+        // Actualizar gráficos
+        function actualizarReportes() {
+            if (Object.keys(inventario).length === 0) {
+                document.getElementById('abc-valor-tabla').innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">Sin productos</td></tr>';
+                document.getElementById('eoq-tabla').innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Sin productos</td></tr>';
+                document.getElementById('cadencia-tabla').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Sin productos</td></tr>';
+                return;
+            }
+            
+            // Análisis ABC por Valor
+            const { clasificados: abcValor, valorTotal } = calcularAnalisisABC();
+            actualizarTablaAbcValor(abcValor, valorTotal);
+            actualizarGraficoAbcValor(abcValor);
+            
+            // Análisis ABC por Rotación
+            const { clasificados: abcRotacion } = calcularAnalisisRotacion();
+            actualizarGraficoAbcRotacion(abcRotacion);
+            
+            // Inventario por Tipo
+            actualizarGraficoTipoProducto();
+            
+            // EOQ Avanzado
+            actualizarAnalisisEOQ();
+            
+            // Cadencia
+            actualizarCadencia();
+        }
+        
+        function actualizarTablaAbcValor(productos, valorTotal) {
+            const tbody = document.getElementById('abc-valor-tabla');
+            let contA = 0, contB = 0, contC = 0;
+            let valorA = 0, valorB = 0, valorC = 0;
+            
+            tbody.innerHTML = productos.map(p => {
+                const porcentajeInventario = valorTotal > 0 ? (p.valor / valorTotal * 100) : 0;
+                let clase = '';
+                if (p.clasificacion === 'A') {
+                    contA++;
+                    valorA += p.valor;
+                    clase = 'abc-label-a';
+                } else if (p.clasificacion === 'B') {
+                    contB++;
+                    valorB += p.valor;
+                    clase = 'abc-label-b';
+                } else {
+                    contC++;
+                    valorC += p.valor;
+                    clase = 'abc-label-c';
+                }
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3">${p.nombre}</td>
+                        <td class="px-4 py-3">$${p.valor.toFixed(2)}</td>
+                        <td class="px-4 py-3">${porcentajeInventario.toFixed(1)}%</td>
+                        <td class="px-4 py-3"><span class="${clase}">${p.clasificacion}</span></td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('abc-a-cantidad').textContent = `${contA} productos`;
+            document.getElementById('abc-a-valor').textContent = `Valor: $${valorA.toFixed(2)}`;
+            document.getElementById('abc-b-cantidad').textContent = `${contB} productos`;
+            document.getElementById('abc-b-valor').textContent = `Valor: $${valorB.toFixed(2)}`;
+            document.getElementById('abc-c-cantidad').textContent = `${contC} productos`;
+            document.getElementById('abc-c-valor').textContent = `Valor: $${valorC.toFixed(2)}`;
+        }
+        
+        function actualizarGraficoAbcValor(productos) {
+            const ctx = document.getElementById('chartAbcValor');
+            if (!ctx) return;
+            
+            if (chartInstances.abcValor) chartInstances.abcValor.destroy();
+            
+            const labels = productos.map(p => p.nombre);
+            const valores = productos.map(p => p.valor);
+            const colores = productos.map(p => 
+                p.clasificacion === 'A' ? '#dc2626' : p.clasificacion === 'B' ? '#f59e0b' : '#10b981'
+            );
+            
+            chartInstances.abcValor = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Valor del Inventario ($)',
+                        data: valores,
+                        backgroundColor: colores,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+        
+        function actualizarGraficoAbcRotacion(productos) {
+            const ctx = document.getElementById('chartAbcRotacion');
+            if (!ctx) return;
+            
+            if (chartInstances.abcRotacion) chartInstances.abcRotacion.destroy();
+            
+            const labels = productos.map(p => p.nombre);
+            const rotaciones = productos.map(p => p.rotacionAnual);
+            const colores = productos.map(p => 
+                p.clasificacion === 'A' ? '#dc2626' : p.clasificacion === 'B' ? '#f59e0b' : '#10b981'
+            );
+            
+            let contA = 0, contB = 0, contC = 0;
+            let rotA = 0, rotB = 0, rotC = 0;
+            
+            productos.forEach(p => {
+                if (p.clasificacion === 'A') { contA++; rotA += p.rotacionAnual; }
+                else if (p.clasificacion === 'B') { contB++; rotB += p.rotacionAnual; }
+                else { contC++; rotC += p.rotacionAnual; }
+            });
+            
+            document.getElementById('rot-a-cantidad').textContent = `${contA} productos`;
+            document.getElementById('rot-a-rotaciones').textContent = `Rotaciones: ${(rotA).toFixed(0)}/año`;
+            document.getElementById('rot-b-cantidad').textContent = `${contB} productos`;
+            document.getElementById('rot-b-rotaciones').textContent = `Rotaciones: ${(rotB).toFixed(0)}/año`;
+            document.getElementById('rot-c-cantidad').textContent = `${contC} productos`;
+            document.getElementById('rot-c-rotaciones').textContent = `Rotaciones: ${(rotC).toFixed(0)}/año`;
+            
+            chartInstances.abcRotacion = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: rotaciones,
+                        backgroundColor: colores,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+        
+        function actualizarGraficoTipoProducto() {
+            const ctx = document.getElementById('chartTipoProducto');
+            if (!ctx) return;
+            
+            const tipos = {};
+            Object.entries(inventario).forEach(([nombre, data]) => {
+                const tipo = data.tipo_inventario || 'Otros';
+                const stock = getStockTotal(data);
+                tipos[tipo] = (tipos[tipo] || 0) + stock;
+            });
+            
+            if (chartInstances.tipoProducto) chartInstances.tipoProducto.destroy();
+            
+            const labels = Object.keys(tipos);
+            const datos = Object.values(tipos);
+            const colores = ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+            
+            let statsHTML = '';
+            labels.forEach((tipo, idx) => {
+                statsHTML += `
+                    <div class="p-4 rounded-lg border-l-4" style="border-left-color: ${colores[idx % colores.length]}; background-color: ${colores[idx % colores.length]}20;">
+                        <p class="text-sm text-gray-600">${tipo}</p>
+                        <p class="text-2xl font-bold" style="color: ${colores[idx % colores.length]}">${datos[idx]}</p>
+                        <p class="text-xs text-gray-600">unidades</p>
+                    </div>
+                `;
+            });
+            document.getElementById('tipo-producto-stats').innerHTML = statsHTML;
+            
+            chartInstances.tipoProducto = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: datos,
+                        backgroundColor: colores,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+        
+        function actualizarAnalisisEOQ() {
+            const selectFiltro = document.getElementById('filtro-eoq');
+            selectFiltro.innerHTML = '<option value="">Todos los productos</option>';
+            
+            Object.keys(inventario).forEach(nombre => {
+                selectFiltro.innerHTML += `<option value="${nombre}">${nombre}</option>`;
+            });
+            
+            const tbody = document.getElementById('eoq-tabla');
+            let html = '';
+            
+            Object.entries(inventario).forEach(([nombre, data]) => {
+                const demanda = data.demanda_diaria || 1;
+                const precioUnitario = data.lotes[0]?.precio_unitario || 0;
+                const costoAnualMantenimiento = precioUnitario * COSTO_MANTENIMIENTO_ANUAL_PCT;
+                const demandaAnual = demanda * DIAS_LABORABLES_ANUALES;
+                
+                const eoq = demandaAnual > 0 && costoAnualMantenimiento > 0 ? 
+                    Math.sqrt((2 * demandaAnual * COSTO_PEDIDO_FIJO) / costoAnualMantenimiento) : 0;
+                
+                const frecuencia = eoq > 0 ? Math.ceil(demandaAnual / eoq) : 0;
+                const costoAnual = (demandaAnual / eoq) * COSTO_PEDIDO_FIJO + (eoq / 2) * costoAnualMantenimiento;
+                
+                html += `
+                    <tr class="hover:bg-purple-50">
+                        <td class="px-4 py-3">${nombre}</td>
+                        <td class="px-4 py-3 font-semibold">${Math.round(eoq)}</td>
+                        <td class="px-4 py-3">${data.stock_seguridad}</td>
+                        <td class="px-4 py-3">${LEAD_TIME_PROMEDIO} días</td>
+                        <td class="px-4 py-3">${frecuencia} pedidos/año</td>
+                        <td class="px-4 py-3">$${costoAnual.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html || '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Sin productos</td></tr>';
+        }
+        
+        function actualizarCadencia() {
+            const tbody = document.getElementById('cadencia-tabla');
+            let html = '';
+            
+            Object.entries(inventario).forEach(([nombre, data]) => {
+                const transacciones = registroTransacciones.filter(t => t.producto === nombre && t.tipo === 'Salida');
+                const rotacionAnual = transacciones.length > 0 ? 
+                    (transacciones.reduce((sum, t) => sum + t.cantidad, 0) / (getStockTotal(data) || 1)) : 0;
+                
+                const diasEnAlmacen = rotacionAnual > 0 ? Math.round(365 / rotacionAnual) : 365;
+                const cantidades = transacciones.map(t => t.cantidad);
+                const desviacion = calcularDesviacionEstandar(cantidades);
+                const variabilidad = getStockTotal(data) > 0 ? ((desviacion / getStockTotal(data)) * 100).toFixed(1) : '0';
+                
+                html += `
+                    <tr class="hover:bg-cyan-50">
+                        <td class="px-4 py-3">${nombre}</td>
+                        <td class="px-4 py-3">${diasEnAlmacen}</td>
+                        <td class="px-4 py-3">${rotacionAnual.toFixed(2)}</td>
+                        <td class="px-4 py-3">${desviacion.toFixed(2)}</td>
+                        <td class="px-4 py-3">${variabilidad}%</td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html || '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Sin productos</td></tr>';
+        }
+
+        // ========== INTEGRACIÓN CON GOOGLE SHEETS ==========
+        
+        // Función auxiliar para formatear fechas para Google Sheets
+        function formatearFechaParaSheets(fechaString) {
+            if (!fechaString || fechaString === '') return '';
+            
+            try {
+                // Si ya está en formato YYYY-MM-DD, devolver tal cual
+                if (fechaString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    return fechaString;
+                }
+                
+                // Intentar parsear otros formatos
+                const fecha = new Date(fechaString);
+                if (isNaN(fecha.getTime())) return '';
+                
+                return fecha.toISOString().split('T')[0]; // YYYY-MM-DD
+            } catch (error) {
+                console.warn('Error al formatear fecha:', fechaString, error);
+                return '';
+            }
+        }
+        
+        // Función auxiliar para formatear fecha y hora para Google Sheets
+        function formatearFechaHoraParaSheets(fechaHoraString) {
+            if (!fechaHoraString || fechaHoraString === '') return '';
+            
+            try {
+                const fecha = new Date(fechaHoraString);
+                if (isNaN(fecha.getTime())) return '';
+                
+                // Formato: YYYY-MM-DD HH:MM:SS
+                const year = fecha.getFullYear();
+                const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                const day = String(fecha.getDate()).padStart(2, '0');
+                const hours = String(fecha.getHours()).padStart(2, '0');
+                const minutes = String(fecha.getMinutes()).padStart(2, '0');
+                const seconds = String(fecha.getSeconds()).padStart(2, '0');
+                
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            } catch (error) {
+                console.warn('Error al formatear fecha y hora:', fechaHoraString, error);
+                return '';
+            }
+        }
+        
+        // Actualizar Inventario Actual en Google Sheets
+        async function actualizarInventarioActual() {
+            try {
+                const datosInventario = [];
+                
+                Object.entries(inventario).forEach(([nombre, data]) => {
+                    data.lotes.forEach(lote => {
+                        const registro = {
+                            sku: data.sku,
+                            nombre: nombre,
+                            gtin13: data.gtin13 || '',
+                            tipo_inventario: data.tipo_inventario,
+                            metodo_almacenamiento: data.metodo_almacenamiento,
+                            clasificacion_peligrosidad: data.peligrosidad,
+                            unidad_medida: data.unidad,
+                            cantidad: lote.cantidad,
+                            precio_unitario: lote.precio_unitario,
+                            lote: lote.lote,
+                            fecha_caducidad: formatearFechaParaSheets(lote.vencimiento),
+                            proveedor: lote.proveedor,
+                            numero_documento: data.info_proveedor.numero_doc,
+                            calidad_entrega: lote.calidad_entrega
+                        };
+                        datosInventario.push(registro);
+                    });
+                });
+                
+                // Enviar a n8n para actualizar Google Sheets
+                const datos = await fetchN8n('actualizar_inventario_actual', {
+                    datos: datosInventario,
+                    timestamp: new Date().toISOString()
+                });
+                
+                if (!datos || datos.error) {
+                    console.warn('Error al actualizar Inventario Actual en Google Sheets:', datos ? datos.error : 'Respuesta inválida');
+                    return false;
+                }
+                
+                if (!respuesta.ok) {
+                    console.warn('Error al actualizar Inventario Actual en Google Sheets:', respuesta.status);
+                    return false;
+                } else {
+                    console.log('✅ Inventario Actual actualizado en Google Sheets');
+                    return true;
+                }
+                
+            } catch (error) {
+                console.error('Error al actualizar Inventario Actual:', error);
+            }
+        }
+        
+        // Agregar movimiento al Historial de Movimientos en Google Sheets
+        async function agregarHistorialMovimiento(movimiento) {
+            try {
+                // Buscar información del producto
+                const producto = inventario[movimiento.producto];
+                if (!producto) {
+                    console.warn('Producto no encontrado para historial:', movimiento.producto);
+                    return;
+                }
+                
+                // Encontrar el lote correspondiente (para movimientos de salida)
+                let loteInfo = null;
+                if (movimiento.tipo === 'Salida') {
+                    // Para salidas, buscar el lote más reciente o el que se está saliendo
+                    loteInfo = producto.lotes[producto.lotes.length - 1]; // Último lote (FIFO)
+                } else {
+                    // Para entradas, usar el último lote agregado
+                    loteInfo = producto.lotes[producto.lotes.length - 1];
+                }
+                
+                const registroHistorial = {
+                    fecha_hora: formatearFechaHoraParaSheets(movimiento.fecha_hora),
+                    tipo_movimiento: movimiento.tipo,
+                    producto: movimiento.producto,
+                    sku: producto.sku,
+                    lote: loteInfo ? loteInfo.lote : '',
+                    cantidad: movimiento.cantidad,
+                    unidad_medida: producto.unidad,
+                    precio_unitario: movimiento.precio_unitario,
+                    precio_total: movimiento.costo_total,
+                    metodo_almacenamiento: producto.metodo_almacenamiento,
+                    clasificacion: producto.peligrosidad,
+                    proveedor: loteInfo ? loteInfo.proveedor : '',
+                    calidad_entrega: loteInfo ? loteInfo.calidad_entrega : '',
+                    fecha_caducidad: loteInfo ? formatearFechaParaSheets(loteInfo.vencimiento) : ''
+                };
+                
+                // Enviar a n8n para agregar al historial
+                const datos = await fetchN8n('agregar_historial_movimiento', {
+                    movimiento: registroHistorial,
+                    timestamp: new Date().toISOString()
+                });
+                
+                if (!datos || datos.error) {
+                    console.warn('Error al agregar movimiento al historial:', datos ? datos.error : 'Respuesta inválida');
+                    return false;
+                } else {
+                    console.log('✅ Movimiento agregado al Historial de Movimientos');
+                    return true;
+                }
+                
+            } catch (error) {
+                console.error('Error al agregar movimiento al historial:', error);
+            }
+        }
+        
+        // Función para sincronizar datos con Google Sheets (invisible para usuario)
+        async function sincronizarConGoogleSheets() {
+            try {
+                mostrarIndicadorSincronizacion('syncing');
+                
+                // Actualizar inventario actual
+                const inventarioActualizado = await actualizarInventarioActual();
+                
+                if (inventarioActualizado) {
+                    console.log('✅ Sincronización completa con Google Sheets');
+                    mostrarIndicadorSincronizacion('success');
+                } else {
+                    console.warn('⚠️ Error en sincronización con Google Sheets');
+                    mostrarIndicadorSincronizacion('error');
+                }
+                
+                return inventarioActualizado;
+            } catch (error) {
+                console.error('Error en sincronización con Google Sheets:', error);
+                mostrarIndicadorSincronizacion('error');
+                return false;
+            }
+        }
+        
+        // Sincronizar historial completo de movimientos (para recuperación)
+        async function sincronizarHistorialCompleto() {
+            try {
+                const movimientosParaSync = registroTransacciones.slice(0, 50); // Últimos 50 movimientos
+                
+                for (const movimiento of movimientosParaSync) {
+                    await agregarHistorialMovimiento(movimiento);
+                    // Pequeña pausa para no sobrecargar
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                console.log('✅ Historial completo sincronizado con Google Sheets');
+            } catch (error) {
+                console.error('Error al sincronizar historial completo:', error);
+            }
+        }
+        
+        // Función de diagnóstico para verificar sincronización (opcional para usuario)
+        async function diagnosticarSincronizacion() {
+            console.log('🔍 Iniciando diagnóstico de sincronización con Google Sheets...');
+            
+            try {
+                // Verificar conectividad con n8n
+                const datos = await fetchN8n('diagnostico', {
+                    timestamp: new Date().toISOString()
+                });
+                
+                if (datos && !datos.error) {
+                    console.log('✅ Conectividad con n8n: OK');
+                    
+                    // Verificar sincronización de inventario
+                    const syncInventario = await actualizarInventarioActual();
+                    console.log('📊 Sincronización Inventario Actual:', syncInventario ? 'OK' : 'ERROR');
+                    
+                    // Verificar último movimiento
+                    if (registroTransacciones.length > 0) {
+                        const ultimoMovimiento = registroTransacciones[0];
+                        const syncMovimiento = await agregarHistorialMovimiento(ultimoMovimiento);
+                        console.log('📝 Sincronización Historial Movimientos:', syncMovimiento ? 'OK' : 'ERROR');
+                    }
+                    
+                    console.log('🎯 Diagnóstico completado');
+                } else {
+                    console.error('❌ Error de conectividad con n8n:', respuesta.status);
+                }
+            } catch (error) {
+                console.error('❌ Error en diagnóstico:', error);
+            }
+        }
+        
+        // Sincronización silenciosa: no se muestra ningún indicador al usuario.
+        // La función se mantiene como no-op para que las llamadas existentes
+        // sigan ejecutando la sincronización con Google Sheets vía n8n sin
+        // exponer el estado en pantalla.
+        function mostrarIndicadorSincronizacion(estado) {
+            // Intencionalmente vacío: la sincronización ocurre en segundo plano.
+        }
+        
+        // Manejo del formulario de solicitud de ubicación
+        document.getElementById('ubicacion-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const sku = document.getElementById('ubicacion-sku').value.trim().toUpperCase();
+            const cantidadPallets = parseInt(document.getElementById('ubicacion-cantidad-pallets').value, 10);
+            
+            // Validaciones
+            if (!sku || !cantidadPallets || cantidadPallets <= 0) {
+                alert('❌ Complete el SKU y la cantidad de pallets correctamente');
+                return;
+            }
+            
+            // Mostrar estado de búsqueda
+            mostrarEstadoBusqueda();
+            
+            try {
+                const datos = await fetchN8n('assign_location', {
+                    sku: sku,
+                    cantidad_pallets: cantidadPallets,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Procesar respuesta del webhook
+                procesarRespuestaUbicacion(datos, sku);
+                
+            } catch (error) {
+                console.error('Error al conectar con n8n:', error);
+                mostrarResultadoError();
+            }
+        });
+        
+        // Mostrar estado "Buscando Ubicación"
+        function mostrarEstadoBusqueda() {
+            const estadoDiv = document.getElementById('ubicacion-estado');
+            const resultadoDiv = document.getElementById('ubicacion-resultado');
+            
+            resultadoDiv.classList.add('hidden');
+            estadoDiv.classList.remove('hidden');
+            estadoDiv.innerHTML = `
+                <div class="text-center">
+                    <div class="inline-flex items-center justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
+                        <p class="text-lg font-semibold text-indigo-700">⏳ Asignando ubicación...</p>
+                    </div>
+                </div>
+            `;
+            estadoDiv.style.backgroundColor = '#e0e7ff';
+            estadoDiv.style.borderLeftColor = '#4f46e5';
+            estadoDiv.style.borderLeftWidth = '4px';
+        }
+        
+        // Procesar respuesta de ubicación
+        function procesarRespuestaUbicacion(datos, sku) {
+            const estadoDiv = document.getElementById('ubicacion-estado');
+            const resultadoDiv = document.getElementById('ubicacion-resultado');
+            const mensajeDiv = document.getElementById('ubicacion-mensaje');
+            const idDiv = document.getElementById('ubicacion-id');
+            
+            estadoDiv.classList.add('hidden');
+            resultadoDiv.classList.remove('hidden');
+            
+            // Verificar si se encontró ubicación
+            if (datos.exito && datos.ubicacion_encontrada) {
+                // Éxito: ubicación encontrada
+                resultadoDiv.style.backgroundColor = '#ecfdf5';
+                resultadoDiv.style.borderColor = '#10b981';
+                resultadoDiv.style.borderWidth = '2px';
+                
+                mensajeDiv.innerHTML = '✅ Ubicación asignada correctamente';
+                mensajeDiv.style.color = '#059669';
+                
+                const palletId = datos.id_pallet || datos.pallet_id || datos.id_pallet_asignado || 'N/A';
+                idDiv.style.color = '#10b981';
+                idDiv.style.fontSize = '28px';
+                idDiv.style.marginTop = '12px';
+                idDiv.innerHTML = `📍 ID de Ubicación: <strong>${datos.id_ubicacion || 'N/A'}</strong><br>📦 Pallet asignado: <strong>${palletId}</strong>`;
+                
+                // Registrar asignación de ubicación
+                registrarAsignacionUbicacion(sku, datos.id_ubicacion, palletId);
+                
+                // Sincronizar con Google Sheets (invisible para usuario)
+                sincronizarConGoogleSheets();
+                
+            } else if (datos.error || !datos.exito) {
+                // Error: no se encontró ubicación apta
+                mostrarResultadoError();
+            } else {
+                // Respuesta desconocida
+                mostrarResultadoError('Respuesta inesperada del servidor');
+            }
+        }
+        
+        // Mostrar resultado de error
+        function mostrarResultadoError(mensajeCustom = null) {
+            const estadoDiv = document.getElementById('ubicacion-estado');
+            const resultadoDiv = document.getElementById('ubicacion-resultado');
+            const mensajeDiv = document.getElementById('ubicacion-mensaje');
+            const idDiv = document.getElementById('ubicacion-id');
+            
+            estadoDiv.classList.add('hidden');
+            resultadoDiv.classList.remove('hidden');
+            
+            resultadoDiv.style.backgroundColor = '#fef2f2';
+            resultadoDiv.style.borderColor = '#ef4444';
+            resultadoDiv.style.borderWidth = '2px';
+            
+            mensajeDiv.innerHTML = '❌ Error';
+            mensajeDiv.style.color = '#dc2626';
+            
+            const mensajeError = mensajeCustom || 'No hay ubicaciones aptas, por favor contacta al supervisor';
+            idDiv.style.color = '#dc2626';
+            idDiv.style.fontSize = '16px';
+            idDiv.style.marginTop = '12px';
+            idDiv.innerHTML = `🚨 ${mensajeError}`;
+        }
+        
+        // Registrar asignación de ubicación
+        function registrarAsignacionUbicacion(sku, idUbicacion, palletId) {
+            const ahora = new Date();
+            const registro = {
+                fecha_hora: ahora.toLocaleString('es-ES'),
+                sku: sku,
+                id_ubicacion: idUbicacion,
+                id_pallet: palletId,
+                tipo: 'Asignación de Ubicación'
+            };
+            
+            // Aquí puedes agregar a un historial de asignaciones si lo necesitas
+            console.log('Asignación registrada:', registro);
+        }
+        
+        // Inicializar sincronización al cargar la página
+        window.addEventListener('load', function() {
+            initApp();
+            // Sincronizar datos iniciales con Google Sheets (invisible para usuario)
+            setTimeout(() => {
+                sincronizarConGoogleSheets();
+            }, 2000); // Esperar 2 segundos para que la página cargue completamente
+        });
+        
+        // Exponer función de diagnóstico globalmente (opcional para debugging)
+        window.diagnosticarSincronizacion = diagnosticarSincronizacion;
+    </script>
+ </body>
+</html>
