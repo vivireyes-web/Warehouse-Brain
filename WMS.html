@@ -1,0 +1,1167 @@
+<!doctype html>
+<html lang="es" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warehouse Brain</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'DM Sans', sans-serif; }
+    .sidebar-item { transition: all 0.2s; }
+    .sidebar-item:hover, .sidebar-item.active { background: linear-gradient(135deg, #e0f7fa, #e8f5e9); color: #1565c0; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .toast { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 12px 20px; border-radius: 8px; color: white; font-weight: 500; animation: slideIn 0.3s ease; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ <script src="/_sdk/telemetry_sdk.js"></script></head>
+ <body class="h-full bg-gray-50">
+  <div class="h-full w-full flex overflow-hidden">
+   <!-- Sidebar -->
+   <aside class="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto">
+    <div class="p-5 border-b border-gray-100">
+     <h1 id="app-title" class="text-xl font-bold text-blue-800 flex items-center gap-2"><i data-lucide="warehouse" class="w-6 h-6 text-green-500"></i> Warehouse Brain</h1>
+    </div>
+    <nav class="flex-1 p-3 space-y-1">
+     <button onclick="navigate('producto')" data-nav="producto" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="package" class="w-4 h-4"></i> Producto </button> <button onclick="navigate('preparacion')" data-nav="preparacion" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="clipboard-list" class="w-4 h-4"></i> Preparación de Recepción </button> <button onclick="navigate('recepcion')" data-nav="recepcion" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="truck" class="w-4 h-4"></i> Recepción </button> <button onclick="navigate('almacenamiento')" data-nav="almacenamiento" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="archive" class="w-4 h-4"></i> Almacenamiento </button> <button onclick="navigate('picking')" data-nav="picking" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="shopping-cart" class="w-4 h-4"></i> Picking </button> <button onclick="navigate('consolidado')" data-nav="consolidado" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="layers" class="w-4 h-4"></i> Consolidado </button> <button onclick="navigate('despacho')" data-nav="despacho" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="send" class="w-4 h-4"></i> Despacho </button> <button onclick="navigate('trazabilidad')" data-nav="trazabilidad" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="git-branch" class="w-4 h-4"></i> Trazabilidad </button> <button onclick="navigate('inventario')" data-nav="inventario" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="database" class="w-4 h-4"></i> Inventario </button> <button onclick="navigate('historial')" data-nav="historial" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="history" class="w-4 h-4"></i> Historial de Movimientos </button> <button onclick="navigate('proveedores')" data-nav="proveedores" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="users" class="w-4 h-4"></i> Proveedores y Alertas </button> <button onclick="navigate('kpi')" data-nav="kpi" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 font-medium"> <i data-lucide="bar-chart-2" class="w-4 h-4"></i> KPI y Clasificación ABC </button>
+    </nav>
+   </aside><!-- Main Content -->
+   <main class="flex-1 overflow-y-auto p-6" id="main-content">
+    <!-- Preparación de Recepción (default view) -->
+    <div id="page-preparacion" class="fade-in">
+     <h2 class="text-2xl font-bold text-gray-800 mb-6">Preparación de Recepción</h2><!-- Sub-tabs -->
+     <div class="flex gap-2 mb-6">
+      <button onclick="showSubTab('nueva')" id="tab-nueva" class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">Nueva Preparación</button> <button onclick="showSubTab('lista')" id="tab-lista" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Preparaciones de Recepción</button> <button onclick="showSubTab('modificar')" id="tab-modificar" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Modificar Estado</button>
+     </div><!-- Nueva Preparación -->
+     <div id="subtab-nueva" class="fade-in">
+      <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-3xl">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Nueva Preparación de Recepción</h3>
+       <form id="form-nueva" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+         <label for="f-sku" class="block text-sm font-medium text-gray-600 mb-1">SKU</label> <input id="f-sku" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-proveedor" class="block text-sm font-medium text-gray-600 mb-1">Proveedor</label> <input id="f-proveedor" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-lote" class="block text-sm font-medium text-gray-600 mb-1">Lote</label> <input id="f-lote" type="text" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-fecha-venc" class="block text-sm font-medium text-gray-600 mb-1">Fecha de Vencimiento de Lote</label> <input id="f-fecha-venc" type="date" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-cant-pallets" class="block text-sm font-medium text-gray-600 mb-1">Cantidad de Pallets</label> <input id="f-cant-pallets" type="number" min="1" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-fecha-ingreso" class="block text-sm font-medium text-gray-600 mb-1">Fecha de Ingreso</label> <input id="f-fecha-ingreso" type="date" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-costo" class="block text-sm font-medium text-gray-600 mb-1">Costo por Pallet</label> <input id="f-costo" type="number" min="0" step="0.01" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="f-estado" class="block text-sm font-medium text-gray-600 mb-1">Estado</label> <select id="f-estado" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"> <option value="">Seleccionar...</option> <option value="Pendiente">Pendiente</option> <option value="En Revisión">En Revisión</option> <option value="Aprobado">Aprobado</option> <option value="Rechazado">Rechazado</option> </select>
+        </div><!-- Rejection fields (hidden by default) -->
+        <div id="rejection-fields" class="hidden col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-red-100 mt-2">
+         <div>
+          <label for="f-motivo" class="block text-sm font-medium text-red-600 mb-1">Motivo de Rechazo</label> <select id="f-motivo" class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-300 outline-none"> <option value="">Seleccionar...</option> <option value="No Coincide con Factura Comercial">No Coincide con Factura Comercial</option> <option value="Llegada Fuera de Horario">Llegada Fuera de Horario</option> <option value="Calidad Inaceptable">Calidad Inaceptable</option> </select>
+         </div>
+         <div>
+          <label for="f-cant-rechazada" class="block text-sm font-medium text-red-600 mb-1">Cantidad de Pallets Rechazada</label> <input id="f-cant-rechazada" type="number" min="0" class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-200 focus:border-red-300 outline-none">
+         </div>
+        </div>
+        <div class="col-span-1 md:col-span-2 pt-4">
+         <button type="submit" id="btn-submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors"> Registrar Preparación </button>
+        </div>
+       </form>
+       <div id="form-message" class="mt-4 hidden"></div>
+      </div>
+     </div><!-- Preparaciones de Recepción (tabla) -->
+     <div id="subtab-lista" class="fade-in hidden">
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+       <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+         <thead class="bg-gradient-to-r from-blue-50 to-green-50">
+          <tr>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">ID_entrada</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">SKU</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Proveedor</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Lote</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Fecha Venc.</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Cant. Pallets</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Fecha Ingreso</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Costo/Pallet</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Estado</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Motivo Rechazo</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Cant. Rechazada</th>
+          </tr>
+         </thead>
+         <tbody id="tabla-preparaciones">
+          <tr id="empty-row">
+           <td colspan="11" class="px-3 py-8 text-center text-gray-400">No hay preparaciones registradas</td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div><!-- Modificar Estado -->
+     <div id="subtab-modificar" class="fade-in hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-xl">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Modificar Estado por ID_entrada</h3>
+       <div class="space-y-4">
+        <div>
+         <label for="m-id" class="block text-sm font-medium text-gray-600 mb-1">ID_entrada</label>
+         <div class="flex gap-2">
+          <input id="m-id" type="text" placeholder="Ej: ENT-001" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"> <button onclick="buscarEntrada()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Buscar</button>
+         </div>
+        </div>
+        <div id="modify-result" class="hidden">
+         <div id="modify-info" class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4 text-sm text-gray-700"></div>
+         <div>
+          <label for="m-estado" class="block text-sm font-medium text-gray-600 mb-1">Nuevo Estado</label> <select id="m-estado" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"> <option value="Pendiente">Pendiente</option> <option value="En Revisión">En Revisión</option> <option value="Aprobado">Aprobado</option> <option value="Rechazado">Rechazado</option> </select>
+         </div><!-- Rejection fields for modify -->
+         <div id="modify-rejection-fields" class="hidden mt-4 space-y-4">
+          <div>
+           <label for="m-motivo" class="block text-sm font-medium text-red-600 mb-1">Motivo de Rechazo</label> <select id="m-motivo" class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm"> <option value="">Seleccionar...</option> <option value="No Coincide con Factura Comercial">No Coincide con Factura Comercial</option> <option value="Llegada Fuera de Horario">Llegada Fuera de Horario</option> <option value="Calidad Inaceptable">Calidad Inaceptable</option> </select>
+          </div>
+          <div>
+           <label for="m-cant-rechazada" class="block text-sm font-medium text-red-600 mb-1">Cantidad de Pallets Rechazada</label> <input id="m-cant-rechazada" type="number" min="0" class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm">
+          </div>
+         </div><button onclick="guardarEstado()" id="btn-guardar" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors"> Guardar Cambio </button>
+        </div>
+        <div id="modify-message" class="hidden"></div>
+       </div>
+      </div>
+     </div>
+    </div><!-- Placeholder pages -->
+    <div id="page-producto" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Producto</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="package" class="w-12 h-12 mx-auto mb-3 text-green-300"></i>
+      <p>Módulo de Producto - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-recepcion" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-6">Recepción</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+      <h3 class="text-lg font-semibold text-gray-700 mb-4">Registrar Recepción</h3>
+      <form id="form-recepcion" class="space-y-4">
+       <div>
+        <label for="r-sku" class="block text-sm font-medium text-gray-600 mb-1">SKU</label> <input id="r-sku" type="text" required placeholder="Ingrese el SKU del producto" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+       </div>
+       <div>
+        <label for="r-cantidad" class="block text-sm font-medium text-gray-600 mb-1">Cantidad de Pallets a Recepcionar</label> <input id="r-cantidad" type="number" min="1" required placeholder="Ingrese la cantidad de pallets" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+       </div><button type="submit" id="btn-recepcion" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors w-full"> Asignar Ubicaciones </button>
+      </form>
+      <div id="recepcion-message" class="mt-4 hidden"></div>
+     </div>
+    </div>
+    <div id="page-almacenamiento" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-6">Almacenamiento</h2><!-- Sub-tabs -->
+     <div class="flex gap-2 mb-6">
+      <button onclick="showSubTabAlmacen('almacenar')" id="tab-almacenar" class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">Almacenar Pallet</button> <button onclick="showSubTabAlmacen('solicitudes')" id="tab-solicitudes" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Solicitudes de Reubicación</button> <button onclick="showSubTabAlmacen('reubicar')" id="tab-reubicar" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Reubicar</button>
+     </div><!-- Almacenar Pallet -->
+     <div id="subtab-almacenar" class="fade-in">
+      <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Almacenar Pallet</h3>
+       <form id="form-almacenar" class="space-y-4">
+        <div>
+         <label for="a-id-pallet" class="block text-sm font-medium text-gray-600 mb-1">ID de Pallet</label> <input id="a-id-pallet" type="text" required placeholder="Ej: PAL-001" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="a-id-ubicacion" class="block text-sm font-medium text-gray-600 mb-1">ID de Ubicación</label> <input id="a-id-ubicacion" type="text" required placeholder="Ej: LOC-A1-01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors w-full"> Almacenar </button>
+       </form>
+       <div id="almacenar-message" class="mt-4 hidden"></div>
+      </div>
+     </div><!-- Solicitudes de Reubicación -->
+     <div id="subtab-solicitudes" class="fade-in hidden">
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+       <div class="bg-gradient-to-r from-blue-50 to-green-50 p-4">
+        <h3 class="text-lg font-semibold text-gray-700">Solicitudes de Reubicación Pendientes</h3>
+       </div>
+       <div id="solicitudes-container" class="divide-y divide-gray-100">
+        <div class="p-8 text-center text-gray-400"><i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-cyan-300"></i>
+         <p>No hay solicitudes de reubicación</p>
+        </div>
+       </div>
+      </div>
+     </div><!-- Reubicar -->
+     <div id="subtab-reubicar" class="fade-in hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Reubicar Pallet</h3>
+       <form id="form-reubicar" class="space-y-4">
+        <div>
+         <label for="r-id-ubicacion-inicial" class="block text-sm font-medium text-gray-600 mb-1">ID de Ubicación Inicial</label> <input id="r-id-ubicacion-inicial" type="text" required placeholder="Ej: LOC-A1-01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="r-id-pallet" class="block text-sm font-medium text-gray-600 mb-1">ID de Pallet</label> <input id="r-id-pallet" type="text" required placeholder="Ej: PAL-001" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="r-id-ubicacion-final" class="block text-sm font-medium text-gray-600 mb-1">ID de Ubicación Final</label> <input id="r-id-ubicacion-final" type="text" required placeholder="Ej: LOC-B2-03" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors w-full"> Reubicar </button>
+       </form>
+       <div id="reubicar-message" class="mt-4 hidden"></div>
+      </div>
+     </div>
+    </div>
+    <div id="page-picking" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-6">Picking</h2>
+     <!-- Sub-tabs Picking -->
+     <div class="flex gap-2 mb-6 flex-wrap">
+      <button onclick="showSubTabPicking('generar')" id="tab-generar" class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">Generar Orden de Picking</button>
+      <button onclick="showSubTabPicking('realizar')" id="tab-realizar" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Realizar Picking</button>
+      <button onclick="showSubTabPicking('control')" id="tab-control" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">Control de Picking</button>
+     </div>
+
+     <!-- Generar Orden de Picking -->
+     <div id="subtab-generar" class="fade-in">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+       <!-- Descargar Plantilla -->
+       <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">Descargar Plantilla</h3>
+        <p class="text-sm text-gray-600 mb-4">Descargue la plantilla de Excel para completar los datos de las órdenes de picking.</p>
+        <button onclick="descargarPlantillaExcel()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+         <i data-lucide="download" class="w-4 h-4"></i> Descargar Plantilla Excel
+        </button>
+       </div>
+
+       <!-- Subir Archivo -->
+       <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">Subir Archivo Completado</h3>
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+         <input type="file" id="file-upload" accept=".xlsx,.xls,.csv" class="hidden" onchange="procesarArchivoPickingOrder()">
+         <button onclick="document.getElementById('file-upload').click()" class="text-blue-600 hover:text-blue-700 font-medium text-sm">
+          <i data-lucide="upload-cloud" class="w-6 h-6 mx-auto mb-2"></i>
+          <p>Haga clic para seleccionar archivo</p>
+          <p class="text-xs text-gray-500 mt-1">(Excel .xlsx, .xls o CSV)</p>
+         </button>
+        </div>
+        <div id="file-info" class="mt-4 hidden">
+         <p class="text-sm text-gray-700 font-medium">Archivo seleccionado: <span id="file-name" class="text-blue-600"></span></p>
+        </div>
+       </div>
+      </div>
+
+      <!-- Vista previa de datos -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Vista Previa de Datos</h3>
+       <div class="overflow-x-auto">
+        <table id="tabla-preview" class="w-full text-sm hidden">
+         <thead class="bg-gradient-to-r from-blue-50 to-green-50">
+          <tr>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">N° OC</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">N° Factura</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">RUT Cliente</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Nombre Cliente</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Dirección Entrega</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Comuna</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">SKU Producto</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Cantidad Pallets</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Fecha Entrega</th>
+          </tr>
+         </thead>
+         <tbody id="tbody-preview"></tbody>
+        </table>
+        <div id="tabla-preview-empty" class="text-center text-gray-400 py-8">
+         <p>No hay datos para mostrar</p>
+        </div>
+       </div>
+      </div>
+
+      <!-- Botón Generar Orden -->
+      <div class="mt-6">
+       <button onclick="generarOrdenPickingConfirm()" id="btn-generar-orden" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2" disabled>
+        <i data-lucide="check-circle" class="w-4 h-4"></i> Generar Orden de Picking
+       </button>
+      </div>
+
+      <div id="generar-message" class="mt-4 hidden"></div>
+     </div>
+
+     <!-- Realizar Picking -->
+     <div id="subtab-realizar" class="fade-in hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Completar Picking</h3>
+       <form id="form-realizar-picking" class="space-y-4">
+        <div>
+         <label for="rp-id-ubicacion" class="block text-sm font-medium text-gray-600 mb-1">ID de Ubicación</label>
+         <input id="rp-id-ubicacion" type="text" required placeholder="Ej: LOC-A1-01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="rp-id-pallet" class="block text-sm font-medium text-gray-600 mb-1">ID de Pallet</label>
+         <input id="rp-id-pallet" type="text" required placeholder="Ej: PAL-001" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <div>
+         <label for="rp-id-consolidacion" class="block text-sm font-medium text-gray-600 mb-1">ID de Consolidación</label>
+         <input id="rp-id-consolidacion" type="text" required placeholder="Ej: CON-001" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors">Registrar Picking</button>
+       </form>
+       <div id="realizar-message" class="mt-4 hidden"></div>
+      </div>
+
+      <!-- Historial de Pickings -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Historial de Pickings Realizados</h3>
+       <div class="overflow-x-auto">
+        <table id="tabla-pickings" class="w-full text-sm">
+         <thead class="bg-gradient-to-r from-blue-50 to-green-50">
+          <tr>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">ID Picking</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">ID Ubicación</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">ID Pallet</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">ID Consolidación</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Fecha</th>
+          </tr>
+         </thead>
+         <tbody id="tbody-pickings">
+          <tr>
+           <td colspan="5" class="px-3 py-8 text-center text-gray-400">No hay pickings registrados</td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+
+     <!-- Control de Picking -->
+     <div id="subtab-control" class="fade-in hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+       <!-- Card: Órdenes Liberadas -->
+       <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-sm text-gray-600 mb-1">Órdenes de Picking Liberadas</p>
+          <p id="control-liberadas" class="text-3xl font-bold text-green-600">0</p>
+         </div>
+         <i data-lucide="check-circle" class="w-12 h-12 text-green-300"></i>
+        </div>
+       </div>
+
+       <!-- Card: Órdenes Realizadas -->
+       <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-sm text-gray-600 mb-1">Órdenes de Picking Realizadas</p>
+          <p id="control-realizadas" class="text-3xl font-bold text-blue-600">0</p>
+         </div>
+         <i data-lucide="shopping-cart" class="w-12 h-12 text-blue-300"></i>
+        </div>
+       </div>
+
+       <!-- Progreso -->
+       <div class="md:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-4">Progreso General</h3>
+        <div class="space-y-4">
+         <div>
+          <div class="flex justify-between items-center mb-2">
+           <p class="text-sm font-medium text-gray-700">Porcentaje de Cumplimiento</p>
+           <p id="control-porcentaje" class="text-2xl font-bold text-blue-600">0%</p>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+           <div id="control-barra-progreso" class="bg-gradient-to-r from-blue-600 to-green-600 h-full rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+          </div>
+         </div>
+
+         <div class="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-gray-100">
+          <div class="text-center">
+           <p class="text-xs text-gray-600 mb-1">Pendientes</p>
+           <p id="control-pendientes" class="text-2xl font-bold text-yellow-600">0</p>
+          </div>
+          <div class="text-center">
+           <p class="text-xs text-gray-600 mb-1">Tasa de Cumplimiento</p>
+           <p id="control-tasa" class="text-2xl font-bold text-green-600">0%</p>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+
+      <!-- Tabla Detallada -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+       <h3 class="text-lg font-semibold text-gray-700 mb-4">Órdenes de Picking - Estado Detallado</h3>
+       <div class="overflow-x-auto">
+        <table id="tabla-control-picking" class="w-full text-sm">
+         <thead class="bg-gradient-to-r from-blue-50 to-green-50">
+          <tr>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">N° OC</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">N° Factura</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Cliente</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">SKU</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Pallets</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Estado</th>
+           <th class="px-3 py-3 text-left font-semibold text-gray-700">Fecha Entrega</th>
+          </tr>
+         </thead>
+         <tbody id="tbody-control-picking">
+          <tr>
+           <td colspan="7" class="px-3 py-8 text-center text-gray-400">No hay órdenes de picking</td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+    </div>
+    <div id="page-consolidado" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Consolidado</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="layers" class="w-12 h-12 mx-auto mb-3 text-blue-300"></i>
+      <p>Módulo de Consolidado - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-despacho" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Despacho</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="send" class="w-12 h-12 mx-auto mb-3 text-cyan-300"></i>
+      <p>Módulo de Despacho - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-trazabilidad" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Trazabilidad</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="git-branch" class="w-12 h-12 mx-auto mb-3 text-green-300"></i>
+      <p>Módulo de Trazabilidad - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-inventario" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Inventario</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="database" class="w-12 h-12 mx-auto mb-3 text-blue-300"></i>
+      <p>Módulo de Inventario - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-historial" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Historial de Movimientos</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="history" class="w-12 h-12 mx-auto mb-3 text-cyan-300"></i>
+      <p>Módulo de Historial - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-proveedores" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">Proveedores y Alertas</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="users" class="w-12 h-12 mx-auto mb-3 text-green-300"></i>
+      <p>Módulo de Proveedores - En desarrollo</p>
+     </div>
+    </div>
+    <div id="page-kpi" class="fade-in hidden">
+     <h2 class="text-2xl font-bold text-gray-800 mb-4">KPI y Clasificación ABC</h2>
+     <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><i data-lucide="bar-chart-2" class="w-12 h-12 mx-auto mb-3 text-blue-300"></i>
+      <p>Módulo de KPI - En desarrollo</p>
+     </div>
+    </div>
+   </main>
+  </div>
+  <script>
+    // State
+    let allRecords = [];
+    let entryCounter = 0;
+    let foundRecord = null;
+    let allStorageRecords = [];
+    let storageCounter = 0;
+    let allRelocationRequests = [];
+    let relocationCounter = 0;
+    let pickingOrders = [];
+    let pickingOrderCounter = 0;
+    let allPickings = [];
+    let pickingCounter = 0;
+
+    // Navigation
+    function navigate(page) {
+      document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
+      document.getElementById('page-' + page).classList.remove('hidden');
+      document.querySelectorAll('[data-nav]').forEach(btn => btn.classList.remove('active'));
+      const navBtn = document.querySelector(`[data-nav="${page}"]`);
+      if (navBtn) navBtn.classList.add('active');
+    }
+
+    function showSubTab(tab) {
+      ['nueva', 'lista', 'modificar'].forEach(t => {
+        document.getElementById('subtab-' + t).classList.add('hidden');
+        document.getElementById('tab-' + t).classList.remove('bg-blue-600', 'text-white');
+        document.getElementById('tab-' + t).classList.add('bg-gray-100', 'text-gray-600');
+      });
+      document.getElementById('subtab-' + tab).classList.remove('hidden');
+      document.getElementById('tab-' + tab).classList.remove('bg-gray-100', 'text-gray-600');
+      document.getElementById('tab-' + tab).classList.add('bg-blue-600', 'text-white');
+    }
+
+    function showSubTabAlmacen(tab) {
+      ['almacenar', 'solicitudes', 'reubicar'].forEach(t => {
+        document.getElementById('subtab-' + t).classList.add('hidden');
+        document.getElementById('tab-' + t).classList.remove('bg-blue-600', 'text-white');
+        document.getElementById('tab-' + t).classList.add('bg-gray-100', 'text-gray-600');
+      });
+      document.getElementById('subtab-' + tab).classList.remove('hidden');
+      document.getElementById('tab-' + tab).classList.remove('bg-gray-100', 'text-gray-600');
+      document.getElementById('tab-' + tab).classList.add('bg-blue-600', 'text-white');
+    }
+
+    function showSubTabPicking(tab) {
+      ['generar', 'realizar', 'control'].forEach(t => {
+        document.getElementById('subtab-' + t).classList.add('hidden');
+        document.getElementById('tab-' + t).classList.remove('bg-blue-600', 'text-white');
+        document.getElementById('tab-' + t).classList.add('bg-gray-100', 'text-gray-600');
+      });
+      document.getElementById('subtab-' + tab).classList.remove('hidden');
+      document.getElementById('tab-' + tab).classList.remove('bg-gray-100', 'text-gray-600');
+      document.getElementById('tab-' + tab).classList.add('bg-blue-600', 'text-white');
+    }
+
+    // Show/hide rejection fields
+    document.getElementById('f-estado').addEventListener('change', function() {
+      const fields = document.getElementById('rejection-fields');
+      if (this.value === 'Rechazado') {
+        fields.classList.remove('hidden');
+        fields.classList.add('grid');
+      } else {
+        fields.classList.add('hidden');
+        fields.classList.remove('grid');
+      }
+    });
+
+    document.getElementById('m-estado').addEventListener('change', function() {
+      const fields = document.getElementById('modify-rejection-fields');
+      if (this.value === 'Rechazado') {
+        fields.classList.remove('hidden');
+      } else {
+        fields.classList.add('hidden');
+      }
+    });
+
+    // Toast
+    function showToast(msg, type) {
+      const toast = document.createElement('div');
+      toast.className = 'toast ' + (type === 'success' ? 'bg-green-600' : 'bg-red-500');
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Generate unique ID
+    function generateId() {
+      entryCounter++;
+      return 'ENT-' + String(entryCounter).padStart(3, '0');
+    }
+
+    function generateStorageId() {
+      storageCounter++;
+      return 'ALM-' + String(storageCounter).padStart(3, '0');
+    }
+
+    function generateRelocationId() {
+      relocationCounter++;
+      return 'SOL-' + String(relocationCounter).padStart(3, '0');
+    }
+
+    function generatePickingOrderId() {
+      pickingOrderCounter++;
+      return 'ORD-' + String(pickingOrderCounter).padStart(3, '0');
+    }
+
+    function generatePickingId() {
+      pickingCounter++;
+      return 'PIC-' + String(pickingCounter).padStart(3, '0');
+    }
+
+    // ============= FUNCIONES DE PICKING =============
+
+    // Descargar plantilla Excel
+    function descargarPlantillaExcel() {
+      const plantilla = [
+        {
+          'numero_oc': '',
+          'numero_factura': '',
+          'rut_cliente': '',
+          'nombre_cliente': '',
+          'direccion_entrega': '',
+          'comuna_entrega': '',
+          'sku_producto': '',
+          'cantidad_pallets': '',
+          'fecha_entrega_solicitada': ''
+        }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(plantilla);
+      ws['!cols'] = [
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 20 },
+        { wch: 30 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Plantilla Picking");
+      XLSX.writeFile(wb, "Plantilla_Orden_Picking.xlsx");
+      showToast('Plantilla descargada correctamente', 'success');
+    }
+
+    // Datos globales para generar orden
+    let datosArchivoPickingOrder = [];
+
+    // Procesar archivo de picking
+    function procesarArchivoPickingOrder() {
+      const fileInput = document.getElementById('file-upload');
+      const file = fileInput.files[0];
+      
+      if (!file) return;
+
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-info').classList.remove('hidden');
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = e.target.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          // Validar columnas requeridas
+          if (!validarColumnasPickingOrder(jsonData)) {
+            showToast('El archivo no tiene las columnas requeridas', 'error');
+            return;
+          }
+
+          datosArchivoPickingOrder = jsonData;
+          mostrarVistaPreviaPickingOrder(jsonData);
+          document.getElementById('btn-generar-orden').disabled = false;
+          showToast('Archivo procesado correctamente', 'success');
+        } catch (error) {
+          showToast('Error al procesar archivo: ' + error.message, 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function validarColumnasPickingOrder(datos) {
+      if (datos.length === 0) return false;
+      const primerFila = Object.keys(datos[0]);
+      const columnasRequeridas = [
+        'numero_oc', 'numero_factura', 'rut_cliente', 'nombre_cliente',
+        'direccion_entrega', 'comuna_entrega', 'sku_producto',
+        'cantidad_pallets', 'fecha_entrega_solicitada'
+      ];
+      return columnasRequeridas.every(col => primerFila.includes(col));
+    }
+
+    function mostrarVistaPreviaPickingOrder(datos) {
+      const tbody = document.getElementById('tbody-preview');
+      const tabla = document.getElementById('tabla-preview');
+      
+      if (datos.length === 0) {
+        tabla.classList.add('hidden');
+        document.getElementById('tabla-preview-empty').classList.remove('hidden');
+        return;
+      }
+
+      tbody.innerHTML = datos.slice(0, 10).map(row => `
+        <tr class="border-t border-gray-100 hover:bg-blue-50/30">
+          <td class="px-3 py-2.5">${row.numero_oc || ''}</td>
+          <td class="px-3 py-2.5">${row.numero_factura || ''}</td>
+          <td class="px-3 py-2.5">${row.rut_cliente || ''}</td>
+          <td class="px-3 py-2.5">${row.nombre_cliente || ''}</td>
+          <td class="px-3 py-2.5">${row.direccion_entrega || ''}</td>
+          <td class="px-3 py-2.5">${row.comuna_entrega || ''}</td>
+          <td class="px-3 py-2.5">${row.sku_producto || ''}</td>
+          <td class="px-3 py-2.5">${row.cantidad_pallets || ''}</td>
+          <td class="px-3 py-2.5">${row.fecha_entrega_solicitada || ''}</td>
+        </tr>
+      `).join('');
+
+      tabla.classList.remove('hidden');
+      document.getElementById('tabla-preview-empty').classList.add('hidden');
+    }
+
+    function generarOrdenPickingConfirm() {
+      if (datosArchivoPickingOrder.length === 0) {
+        showToast('Por favor cargue un archivo válido', 'error');
+        return;
+      }
+      generarOrdenPickingAsync();
+    }
+
+    async function generarOrdenPickingAsync() {
+      if (datosArchivoPickingOrder.length === 0) {
+        showToast('No hay datos para generar orden', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-generar-orden');
+      btn.disabled = true;
+      btn.textContent = 'Generando...';
+
+      try {
+        // Crear orden de picking
+        datosArchivoPickingOrder.forEach(row => {
+          const pickingOrder = {
+            id_orden_picking: generatePickingOrderId(),
+            numero_oc: row.numero_oc,
+            numero_factura: row.numero_factura,
+            rut_cliente: row.rut_cliente,
+            nombre_cliente: row.nombre_cliente,
+            direccion_entrega: row.direccion_entrega,
+            comuna_entrega: row.comuna_entrega,
+            sku_producto: row.sku_producto,
+            cantidad_pallets: parseInt(row.cantidad_pallets) || 0,
+            fecha_entrega_solicitada: row.fecha_entrega_solicitada,
+            estado: 'Liberada',
+            fecha_creacion: new Date().toISOString().split('T')[0]
+          };
+
+          pickingOrders.push(pickingOrder);
+          window.dataSdk.create(pickingOrder);
+        });
+
+        const msgEl = document.getElementById('generar-message');
+        msgEl.innerHTML = '<p class="text-green-600 text-sm font-medium flex items-center gap-2"><i data-lucide="check-circle" style="width:16px;height:16px"></i>Orden de Picking generada con ' + datosArchivoPickingOrder.length + ' líneas</p>';
+        msgEl.classList.remove('hidden');
+
+        // Limpiar
+        document.getElementById('file-upload').value = '';
+        document.getElementById('file-info').classList.add('hidden');
+        document.getElementById('tabla-preview').classList.add('hidden');
+        document.getElementById('tabla-preview-empty').classList.remove('hidden');
+        datosArchivoPickingOrder = [];
+
+        showToast('Orden de Picking generada correctamente', 'success');
+        updateControlPickingStats();
+
+        setTimeout(() => msgEl.classList.add('hidden'), 4000);
+      } catch (error) {
+        showToast('Error al generar orden: ' + error.message, 'error');
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Generar Orden de Picking';
+    }
+
+    function renderPickings() {
+      const tbody = document.getElementById('tbody-pickings');
+      
+      if (allPickings.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-gray-400">No hay pickings registrados</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = allPickings.map(p => `
+        <tr class="border-t border-gray-100 hover:bg-blue-50/30">
+          <td class="px-3 py-2.5 font-mono text-xs font-semibold text-blue-700">${p.id_picking}</td>
+          <td class="px-3 py-2.5">${p.id_ubicacion}</td>
+          <td class="px-3 py-2.5">${p.id_pallet}</td>
+          <td class="px-3 py-2.5">${p.id_consolidacion}</td>
+          <td class="px-3 py-2.5">${p.fecha_picking} ${p.hora_picking || ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    function updateControlPickingStats() {
+      const ordenesLiberadas = pickingOrders.filter(o => o.estado === 'Liberada').length;
+      const ordenesRealizadas = allPickings.length;
+      const pendientes = ordenesLiberadas - ordenesRealizadas;
+      const porcentaje = ordenesLiberadas > 0 ? Math.round((ordenesRealizadas / ordenesLiberadas) * 100) : 0;
+
+      document.getElementById('control-liberadas').textContent = ordenesLiberadas;
+      document.getElementById('control-realizadas').textContent = ordenesRealizadas;
+      document.getElementById('control-pendientes').textContent = pendientes;
+      document.getElementById('control-porcentaje').textContent = porcentaje + '%';
+      document.getElementById('control-tasa').textContent = porcentaje + '%';
+      document.getElementById('control-barra-progreso').style.width = porcentaje + '%';
+
+      renderTablaControlPickings();
+    }
+
+    function renderTablaControlPickings() {
+      const tbody = document.getElementById('tbody-control-picking');
+      
+      if (pickingOrders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-8 text-center text-gray-400">No hay órdenes de picking</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = pickingOrders.map(o => {
+        const realizada = allPickings.some(p => p.id_pallet && p.id_ubicacion);
+        const estadoBadge = realizada ? 
+          'bg-green-100 text-green-700' : 
+          'bg-yellow-100 text-yellow-700';
+        const estadoTexto = realizada ? 'Realizada' : 'Pendiente';
+
+        return `
+          <tr class="border-t border-gray-100 hover:bg-blue-50/30">
+            <td class="px-3 py-2.5">${o.numero_oc || '-'}</td>
+            <td class="px-3 py-2.5">${o.numero_factura || '-'}</td>
+            <td class="px-3 py-2.5">${o.nombre_cliente || '-'}</td>
+            <td class="px-3 py-2.5">${o.sku_producto || '-'}</td>
+            <td class="px-3 py-2.5">${o.cantidad_pallets || 0}</td>
+            <td class="px-3 py-2.5"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${estadoBadge}">${estadoTexto}</span></td>
+            <td class="px-3 py-2.5">${o.fecha_entrega_solicitada || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Form submit
+    document.getElementById('form-nueva').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (allRecords.length >= 999) {
+        showToast('Límite de 999 registros alcanzado', 'error');
+        return;
+      }
+      const estado = document.getElementById('f-estado').value;
+      const record = {
+        id_entrada: generateId(),
+        sku: document.getElementById('f-sku').value,
+        proveedor: document.getElementById('f-proveedor').value,
+        lote: document.getElementById('f-lote').value,
+        fecha_vencimiento_lote: document.getElementById('f-fecha-venc').value,
+        cantidad_pallets: parseInt(document.getElementById('f-cant-pallets').value),
+        fecha_ingreso: document.getElementById('f-fecha-ingreso').value,
+        costo_por_pallet: parseFloat(document.getElementById('f-costo').value),
+        estado: estado,
+        motivo_rechazo: estado === 'Rechazado' ? document.getElementById('f-motivo').value : '',
+        cantidad_rechazada: estado === 'Rechazado' ? parseInt(document.getElementById('f-cant-rechazada').value || 0) : 0
+      };
+
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.textContent = 'Registrando...';
+
+      const result = await window.dataSdk.create(record);
+      btn.disabled = false;
+      btn.textContent = 'Registrar Preparación';
+
+      if (result.isOk) {
+        showToast('Preparación ' + record.id_entrada + ' registrada', 'success');
+        this.reset();
+        document.getElementById('rejection-fields').classList.add('hidden');
+        document.getElementById('rejection-fields').classList.remove('grid');
+      } else {
+        showToast('Error al registrar', 'error');
+      }
+    });
+
+    // Form Recepción submit
+    document.getElementById('form-recepcion').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const sku = document.getElementById('r-sku').value;
+      const cantidad = document.getElementById('r-cantidad').value;
+      const msgEl = document.getElementById('recepcion-message');
+      
+      msgEl.innerHTML = '<p class="text-green-600 text-sm font-medium flex items-center gap-2"><i data-lucide="check-circle" style="width:16px;height:16px"></i>Recepción registrada: ' + cantidad + ' pallets de SKU ' + sku + '</p>';
+      msgEl.classList.remove('hidden');
+      
+      this.reset();
+      lucide.createIcons();
+      
+      setTimeout(() => msgEl.classList.add('hidden'), 4000);
+    });
+
+    // Form Almacenar Pallet
+    document.getElementById('form-almacenar').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const idPallet = document.getElementById('a-id-pallet').value;
+      const idUbicacion = document.getElementById('a-id-ubicacion').value;
+      
+      if (allStorageRecords.length >= 999) {
+        showToast('Límite de registros alcanzado', 'error');
+        return;
+      }
+
+      const storageRecord = {
+        id_pallet: idPallet,
+        id_ubicacion: idUbicacion,
+        estado_almacenamiento: 'Almacenado'
+      };
+
+      const result = await window.dataSdk.create(storageRecord);
+      
+      if (result.isOk) {
+        showToast('Pallet ' + idPallet + ' almacenado en ' + idUbicacion, 'success');
+        this.reset();
+      } else {
+        showToast('Error al almacenar pallet', 'error');
+      }
+    });
+
+    // Form Reubicar Pallet
+    document.getElementById('form-reubicar').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const idUbicacionInicial = document.getElementById('r-id-ubicacion-inicial').value;
+      const idPallet = document.getElementById('r-id-pallet').value;
+      const idUbicacionFinal = document.getElementById('r-id-ubicacion-final').value;
+
+      if (allRelocationRequests.length >= 999) {
+        showToast('Límite de solicitudes alcanzado', 'error');
+        return;
+      }
+
+      const relocationRecord = {
+        id_solicitud_reubicacion: generateRelocationId(),
+        id_ubicacion_inicial: idUbicacionInicial,
+        id_pallet: idPallet,
+        id_ubicacion_final: idUbicacionFinal
+      };
+
+      const result = await window.dataSdk.create(relocationRecord);
+      
+      if (result.isOk) {
+        showToast('Solicitud de reubicación creada para pallet ' + idPallet, 'success');
+        this.reset();
+      } else {
+        showToast('Error al crear solicitud', 'error');
+      }
+    });
+
+    // Form Realizar Picking
+    const formRealizarPicking = document.getElementById('form-realizar-picking');
+    if (formRealizarPicking) {
+      formRealizarPicking.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const idUbicacion = document.getElementById('rp-id-ubicacion').value;
+        const idPallet = document.getElementById('rp-id-pallet').value;
+        const idConsolidacion = document.getElementById('rp-id-consolidacion').value;
+
+        const picking = {
+          id_picking: generatePickingId(),
+          id_ubicacion: idUbicacion,
+          id_pallet: idPallet,
+          id_consolidacion: idConsolidacion,
+          fecha_picking: new Date().toISOString().split('T')[0],
+          hora_picking: new Date().toTimeString().split(' ')[0],
+          estado: 'Completado'
+        };
+
+        const result = await window.dataSdk.create(picking);
+        
+        if (result.isOk) {
+          allPickings.push(picking);
+          showToast('Picking registrado correctamente', 'success');
+          this.reset();
+          renderPickings();
+          updateControlPickingStats();
+        } else {
+          showToast('Error al registrar picking', 'error');
+        }
+      });
+    }
+
+    // Render solicitudes
+    function renderSolicitudes(data) {
+      const container = document.getElementById('solicitudes-container');
+      const relocationSolicitudes = data.filter(r => r.id_solicitud_reubicacion);
+      
+      if (relocationSolicitudes.length === 0) {
+        container.innerHTML = '<div class="p-8 text-center text-gray-400"><i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-cyan-300"></i><p>No hay solicitudes de reubicación</p></div>';
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = relocationSolicitudes.map(r => `
+        <div class="p-4 hover:bg-blue-50/30 transition">
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <p class="font-mono text-xs font-semibold text-blue-700 mb-1">${r.id_solicitud_reubicacion}</p>
+              <p class="text-sm text-gray-600"><strong>Pallet:</strong> ${r.id_pallet}</p>
+              <p class="text-sm text-gray-600"><strong>De:</strong> ${r.id_ubicacion_inicial} <i data-lucide="arrow-right" style="width:14px;height:14px;display:inline"></i> <strong>A:</strong> ${r.id_ubicacion_final}</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="aprobarSolicitud('${r.__backendId}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
+                <i data-lucide="check" style="width:14px;height:14px;display:inline;margin-right:4px"></i>Aprobar
+              </button>
+              <button onclick="rechazarSolicitud('${r.__backendId}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
+                <i data-lucide="x" style="width:14px;height:14px;display:inline;margin-right:4px"></i>Rechazar
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    async function aprobarSolicitud(backendId) {
+      const solicitud = allRelocationRequests.find(r => r.__backendId === backendId);
+      if (!solicitud) return;
+
+      await window.dataSdk.delete(solicitud);
+      showToast('Solicitud aprobada: Pallet reubicado', 'success');
+    }
+
+    async function rechazarSolicitud(backendId) {
+      const solicitud = allRelocationRequests.find(r => r.__backendId === backendId);
+      if (!solicitud) return;
+
+      await window.dataSdk.delete(solicitud);
+      showToast('Solicitud rechazada', 'error');
+    }
+
+    // Search for modify
+    function buscarEntrada() {
+      const id = document.getElementById('m-id').value.trim();
+      foundRecord = allRecords.find(r => r.id_entrada === id);
+      const msgEl = document.getElementById('modify-message');
+      const resultEl = document.getElementById('modify-result');
+
+      if (!foundRecord) {
+        resultEl.classList.add('hidden');
+        msgEl.innerHTML = '<p class="text-red-500 text-sm">No se encontró el ID_entrada: ' + id + '</p>';
+        msgEl.classList.remove('hidden');
+        return;
+      }
+      msgEl.classList.add('hidden');
+      resultEl.classList.remove('hidden');
+      document.getElementById('modify-info').innerHTML = `<strong>SKU:</strong> ${foundRecord.sku} | <strong>Proveedor:</strong> ${foundRecord.proveedor} | <strong>Estado actual:</strong> <span class="font-semibold">${foundRecord.estado}</span>`;
+      document.getElementById('m-estado').value = foundRecord.estado;
+      if (foundRecord.estado === 'Rechazado') {
+        document.getElementById('modify-rejection-fields').classList.remove('hidden');
+        document.getElementById('m-motivo').value = foundRecord.motivo_rechazo || '';
+        document.getElementById('m-cant-rechazada').value = foundRecord.cantidad_rechazada || 0;
+      } else {
+        document.getElementById('modify-rejection-fields').classList.add('hidden');
+      }
+    }
+
+    async function guardarEstado() {
+      if (!foundRecord) return;
+      const nuevoEstado = document.getElementById('m-estado').value;
+      const updated = { ...foundRecord, estado: nuevoEstado };
+      if (nuevoEstado === 'Rechazado') {
+        updated.motivo_rechazo = document.getElementById('m-motivo').value;
+        updated.cantidad_rechazada = parseInt(document.getElementById('m-cant-rechazada').value || 0);
+      } else {
+        updated.motivo_rechazo = '';
+        updated.cantidad_rechazada = 0;
+      }
+
+      const btn = document.getElementById('btn-guardar');
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      const result = await window.dataSdk.update(updated);
+      btn.disabled = false;
+      btn.textContent = 'Guardar Cambio';
+
+      if (result.isOk) {
+        showToast('Estado actualizado a: ' + nuevoEstado, 'success');
+        document.getElementById('modify-result').classList.add('hidden');
+        document.getElementById('m-id').value = '';
+      } else {
+        showToast('Error al actualizar', 'error');
+      }
+    }
+
+    // Render table
+    function renderTable(data) {
+      const tbody = document.getElementById('tabla-preparaciones');
+      const receptionsOnly = data.filter(r => r.id_entrada);
+      
+      if (receptionsOnly.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="px-3 py-8 text-center text-gray-400">No hay preparaciones registradas</td></tr>';
+        return;
+      }
+      tbody.innerHTML = receptionsOnly.map(r => {
+        const estadoColor = r.estado === 'Aprobado' ? 'bg-green-100 text-green-700' : r.estado === 'Rechazado' ? 'bg-red-100 text-red-700' : r.estado === 'En Revisión' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600';
+        return `<tr class="border-t border-gray-100 hover:bg-blue-50/30">
+          <td class="px-3 py-2.5 font-mono text-xs font-semibold text-blue-700">${r.id_entrada}</td>
+          <td class="px-3 py-2.5">${r.sku}</td>
+          <td class="px-3 py-2.5">${r.proveedor}</td>
+          <td class="px-3 py-2.5">${r.lote}</td>
+          <td class="px-3 py-2.5">${r.fecha_vencimiento_lote}</td>
+          <td class="px-3 py-2.5">${r.cantidad_pallets}</td>
+          <td class="px-3 py-2.5">${r.fecha_ingreso}</td>
+          <td class="px-3 py-2.5">$${r.costo_por_pallet}</td>
+          <td class="px-3 py-2.5"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${estadoColor}">${r.estado}</span></td>
+          <td class="px-3 py-2.5 text-xs">${r.motivo_rechazo || '-'}</td>
+          <td class="px-3 py-2.5">${r.cantidad_rechazada || '-'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Data SDK
+    const dataHandler = {
+      onDataChanged(data) {
+        allRecords = data.filter(r => r.id_entrada);
+        allStorageRecords = data.filter(r => r.id_pallet && !r.id_solicitud_reubicacion);
+        allRelocationRequests = data.filter(r => r.id_solicitud_reubicacion);
+        pickingOrders = data.filter(r => r.id_orden_picking);
+        allPickings = data.filter(r => r.id_picking);
+
+        // Sync counters
+        data.forEach(r => {
+          if (r.id_entrada) {
+            const num = parseInt((r.id_entrada || '').replace('ENT-', ''));
+            if (num > entryCounter) entryCounter = num;
+          }
+          if (r.id_pallet && !r.id_solicitud_reubicacion) {
+            const num = parseInt((r.id_pallet || '').replace('ALM-', ''));
+            if (num > storageCounter) storageCounter = num;
+          }
+          if (r.id_solicitud_reubicacion) {
+            const num = parseInt((r.id_solicitud_reubicacion || '').replace('SOL-', ''));
+            if (num > relocationCounter) relocationCounter = num;
+          }
+          if (r.id_orden_picking) {
+            const num = parseInt((r.id_orden_picking || '').replace('ORD-', ''));
+            if (num > pickingOrderCounter) pickingOrderCounter = num;
+          }
+          if (r.id_picking) {
+            const num = parseInt((r.id_picking || '').replace('PIC-', ''));
+            if (num > pickingCounter) pickingCounter = num;
+          }
+        });
+
+        renderTable(data);
+        renderSolicitudes(data);
+        renderPickings();
+        updateControlPickingStats();
+      }
+    };
+
+    // Init
+    (async () => {
+      await window.dataSdk.init(dataHandler);
+      navigate('preparacion');
+    })();
+
+    // Element SDK
+    const defaultConfig = {
+      app_title: 'Warehouse Brain',
+      background_color: '#f9fafb',
+      surface_color: '#ffffff',
+      text_color: '#1f2937',
+      primary_action: '#2563eb',
+      secondary_action: '#0891b2'
+    };
+
+    window.elementSdk.init({
+      defaultConfig,
+      onConfigChange: async (config) => {
+        document.getElementById('app-title').childNodes[1].textContent = ' ' + (config.app_title || defaultConfig.app_title);
+        document.body.style.backgroundColor = config.background_color || defaultConfig.background_color;
+      },
+      mapToCapabilities: (config) => ({
+        recolorables: [
+          { get: () => config.background_color || defaultConfig.background_color, set: (v) => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+          { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+          { get: () => config.text_color || defaultConfig.text_color, set: (v) => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+          { get: () => config.primary_action || defaultConfig.primary_action, set: (v) => { config.primary_action = v; window.elementSdk.setConfig({ primary_action: v }); } },
+          { get: () => config.secondary_action || defaultConfig.secondary_action, set: (v) => { config.secondary_action = v; window.elementSdk.setConfig({ secondary_action: v }); } }
+        ],
+        borderables: [],
+        fontEditable: undefined,
+        fontSizeable: undefined
+      }),
+      mapToEditPanelValues: (config) => new Map([
+        ['app_title', config.app_title || defaultConfig.app_title]
+      ])
+    });
+
+    lucide.createIcons();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a085df49f8086481',t:'MTc4MDkwMDQ4MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
